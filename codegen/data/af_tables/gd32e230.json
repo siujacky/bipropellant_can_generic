@@ -1,0 +1,24 @@
+{
+  "_meta": {
+    "family": "GD32E2",
+    "part_hint": "GD32E230C8T6 (Cortex-M23 / GigaDevice E2 series)",
+    "source": "GigaDevice GD32E23x User Manual. Similar to GD32F1x0 but Cortex-M23 core. TIMER0 (= TIM1) is the advanced-control timer.",
+    "license": "Transcribed from public datasheet; no copyright on hardware register definitions."
+  },
+  "PA8":  [{"peripheral": "TIMER0", "channel": "CH0", "af": 2}],
+  "PA9":  [{"peripheral": "TIMER0", "channel": "CH1", "af": 2}, {"peripheral": "USART0", "channel": "TX", "af": 1}],
+  "PA10": [{"peripheral": "TIMER0", "channel": "CH2", "af": 2}, {"peripheral": "USART0", "channel": "RX", "af": 1}],
+  "PA11": [{"peripheral": "TIMER0", "channel": "CH3", "af": 2}],
+  "PA7":  [{"peripheral": "TIMER0", "channel": "CH0N", "af": 2}],
+  "PB0":  [{"peripheral": "TIMER0", "channel": "CH1N", "af": 2}],
+  "PB1":  [{"peripheral": "TIMER0", "channel": "CH2N", "af": 2}],
+  "PB13": [{"peripheral": "TIMER0", "channel": "CH0N", "af": 2}],
+  "PB14": [{"peripheral": "TIMER0", "channel": "CH1N", "af": 2}],
+  "PB15": [{"peripheral": "TIMER0", "channel": "CH2N", "af": 2}],
+  "PA0":  [{"peripheral": "TIMER1", "channel": "CH0", "af": 2}],
+  "PA1":  [{"peripheral": "TIMER1", "channel": "CH1", "af": 2}],
+  "PA2":  [{"peripheral": "TIMER1", "channel": "CH2", "af": 2}],
+  "PA3":  [{"peripheral": "TIMER1", "channel": "CH3", "af": 2}],
+  "PB6":  [{"peripheral": "TIMER15", "channel": "CH0N", "af": 2}, {"peripheral": "I2C0", "channel": "SCL", "af": 1}],
+  "PB7":  [{"peripheral": "TIMER16", "channel": "CH0N", "af": 2}, {"peripheral": "I2C0", "channel": "SDA", "af": 1}]
+}

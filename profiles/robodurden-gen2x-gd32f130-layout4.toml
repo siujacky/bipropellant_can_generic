@@ -1,0 +1,54 @@
+# Captured from RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32 (TARGET=1, LAYOUT=4)
+# Source: defines_2-1-4.h
+# GD32F130 with hall sensors on ADC-capable port A pins (PA0-PA2 used as digital here).
+
+[meta]
+name = "RoboDurden Gen2.x-GD32 LAYOUT 1-4 (GD32F130 PA-hall variant)"
+source = "imported-from-RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32"
+notes = "Hall sensors on PA0/PA1/PA2. All three LEDs distinctly defined. No charger detect pin."
+confidence = 1.0
+
+[chip]
+family = "GD32F1"
+part_hint = "GD32F130C8T6"
+
+[power]
+self_hold = "PA3"
+self_hold_active_high = true
+
+[halls_right]
+hall_a = "PA0"
+hall_b = "PA1"
+hall_c = "PA2"
+
+[phases_right]
+timer = "TIMER0"
+u_high = "PA8"
+u_low = "PB13"
+v_high = "PA9"
+v_low = "PB14"
+w_high = "PA10"
+w_low = "PB15"
+dead_time_ns = 833
+
+[indicators]
+led_red = "PB4"
+led_green = "PB3"
+led_orange = "PA15"
+buzzer = "PA11"
+
+[inputs]
+button = "PA4"
+button_active_low = true
+
+[sensing.battery_voltage]
+adc_unit = 1
+channel = 5
+on_pin = { port = "A", pin = 5 }
+divider = 13.0
+
+[sensing.left_phase_current]
+adc_unit = 1
+channel = 6
+on_pin = { port = "A", pin = 6 }
+shunt_resistor_milliohms = 1.0

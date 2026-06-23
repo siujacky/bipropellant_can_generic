@@ -1,0 +1,56 @@
+# Captured from RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32 (TARGET=2, LAYOUT=1)
+# Source: https://github.com/RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32 → HoverBoardGigaDevice/Inc/defines/defines_2-2-1.h
+#
+# Single-motor sideboard on STM32F103 (or GD32F103, pin-compatible).
+# Note: phase pins identical to LAYOUT 2-1-1 but hall + IO pins differ.
+
+[meta]
+name = "RoboDurden Gen2.x STM32F103 LAYOUT 1 (single-motor sideboard)"
+source = "imported-from-RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32"
+notes = "STM32F103 / GD32F103 single-motor variant. Different hall + IO pinout vs GD32F130 variant."
+confidence = 1.0
+
+[chip]
+family = "STM32F1"
+part_hint = "STM32F103C8T6 / GD32F103C8T6"
+
+[power]
+self_hold = "PA4"
+self_hold_active_high = true
+
+[halls_right]
+hall_a = "PA1"
+hall_b = "PA0"
+hall_c = "PA2"
+
+[phases_right]
+timer = "TIMER0"
+# RoboDurden's Y/B/G convention → our U/V/W:
+u_high = "PA8"
+u_low = "PB13"
+v_high = "PA9"
+v_low = "PB14"
+w_high = "PA10"
+w_low = "PB15"
+dead_time_ns = 833
+
+[indicators]
+led_red = "PA15"
+led_green = "PB3"
+led_orange = "PB4"
+
+[inputs]
+button = "PA3"
+button_active_low = true
+
+[sensing.battery_voltage]
+adc_unit = 1
+channel = 5
+on_pin = { port = "A", pin = 5 }
+divider = 13.0
+
+[sensing.left_phase_current]
+adc_unit = 1
+channel = 7
+on_pin = { port = "A", pin = 7 }
+shunt_resistor_milliohms = 1.0

@@ -1,0 +1,59 @@
+# Captured from RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32 (TARGET=1, LAYOUT=1)
+# Source: https://github.com/RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32 → HoverBoardGigaDevice/Inc/defines/defines_2-1-1.h
+#
+# Single-motor sideboard variant on GD32F130 (Cortex-M3 Cortex-M3-class chip).
+# TIMER0 is the BLDC timer. Channel mapping: Y=CH0, B=CH1, G=CH2.
+# Mapped to our schema: phases_right (single-motor boards use right only).
+
+[meta]
+name = "RoboDurden Gen2.x-GD32 LAYOUT 1 (GD32F130 single-motor)"
+source = "imported-from-RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32"
+notes = "Single-motor variant. PWM frequency 16kHz, dead-time 60 ticks."
+confidence = 1.0
+
+[chip]
+family = "GD32F1"
+part_hint = "GD32F130C8T6"
+
+[power]
+self_hold = "PB2"
+self_hold_active_high = true
+
+[halls_right]
+hall_a = "PB11"
+hall_b = "PF1"
+hall_c = "PC14"
+
+[phases_right]
+timer = "TIMER0"
+# In RoboDurden's naming: Y=phase U, B=phase V, G=phase W. Mapped to standard U/V/W:
+u_high = "PA8"
+u_low = "PB13"
+v_high = "PA9"
+v_low = "PB14"
+w_high = "PA10"
+w_low = "PB15"
+dead_time_ns = 833  # 60 ticks at 72MHz ≈ 833 ns
+
+[indicators]
+led_red = "PB3"
+led_green = "PA15"
+led_orange = "PA12"
+
+[inputs]
+button = "PC15"
+button_active_low = true
+charger_detect = "PF0"
+charger_active_low = true
+
+[sensing.battery_voltage]
+adc_unit = 1
+channel = 4
+on_pin = { port = "A", pin = 4 }
+divider = 13.0
+
+[sensing.left_phase_current]
+adc_unit = 1
+channel = 6
+on_pin = { port = "A", pin = 6 }
+shunt_resistor_milliohms = 1.0

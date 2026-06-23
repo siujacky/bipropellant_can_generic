@@ -1,0 +1,42 @@
+# Captured from RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32 (TARGET=3, LAYOUT=3)
+# Source: defines_2-3-3.h
+# GD32E230 LAYOUT 3 — reversed phase pin order. Halls conflict with original LED
+# pin assignments, so LEDs commented out in source (we leave them blank).
+# VBATT and CURRENT_DC also missing in source.
+
+[meta]
+name = "RoboDurden Gen2.x GD32E230 LAYOUT 3 (reversed phases, no LEDs/VBATT)"
+source = "imported-from-RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32"
+notes = "Phase pins reversed (high on PB, low on PA). LEDs and VBATT not defined in source. Discovery must find them."
+confidence = 0.75
+
+[chip]
+family = "GD32E2"
+part_hint = "GD32E230C8T6"
+
+[power]
+self_hold = "PB2"
+self_hold_active_high = true
+
+[halls_right]
+hall_a = "PB10"
+hall_b = "PB3"
+hall_c = "PA15"
+
+[phases_right]
+timer = "TIMER0"
+# Reversed: high side on PB13-15, low side on PA8-10
+u_high = "PB13"
+u_low = "PA8"
+v_high = "PB14"
+v_low = "PA9"
+w_high = "PB15"
+w_low = "PA10"
+dead_time_ns = 833
+
+[indicators]
+buzzer = "PF0"
+
+[inputs]
+button = "PA5"
+button_active_low = true

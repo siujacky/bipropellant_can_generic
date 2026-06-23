@@ -1,0 +1,57 @@
+# Captured from RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32 (TARGET=3, LAYOUT=1)
+# Source: defines_2-3-1.h
+# GD32E230 (Cortex-M23) variant. Phase pins are REVERSED vs. standard layouts:
+# high side on PORT B pins, low side on PORT A pins. Verify against PCB.
+
+[meta]
+name = "RoboDurden Gen2.x GD32E230 LAYOUT 1 (reversed BLDC pins)"
+source = "imported-from-RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32"
+notes = "GD32E230 Cortex-M23. Phase high-side on PB13-15, low-side on PA8-10 (REVERSED). LED_ORANGE/BUZZER both reference PB4 in headers — kept LED_ORANGE. Phase pin order verified against PCB before use."
+confidence = 0.85
+
+[chip]
+family = "GD32E2"
+part_hint = "GD32E230C8T6"
+
+[power]
+self_hold = "PB2"
+self_hold_active_high = true
+
+[halls_right]
+hall_a = "PA1"
+hall_b = "PC14"
+hall_c = "PB11"
+
+[phases_right]
+timer = "TIMER0"
+# NOTE: pin assignments reversed vs typical hoverboard layout
+u_high = "PB13"
+u_low = "PA8"
+v_high = "PB14"
+v_low = "PA9"
+w_high = "PB15"
+w_low = "PA10"
+dead_time_ns = 833
+
+[indicators]
+led_red = "PB5"
+led_orange = "PB4"
+led_green = "PB3"
+
+[inputs]
+button = "PA5"
+button_active_low = true
+charger_detect = "PC15"
+charger_active_low = true
+
+[sensing.battery_voltage]
+adc_unit = 1
+channel = 4
+on_pin = { port = "A", pin = 4 }
+divider = 13.0
+
+[sensing.left_phase_current]
+adc_unit = 1
+channel = 6
+on_pin = { port = "A", pin = 6 }
+shunt_resistor_milliohms = 1.0

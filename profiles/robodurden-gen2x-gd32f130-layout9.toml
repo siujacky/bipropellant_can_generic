@@ -1,0 +1,56 @@
+# Captured from RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32 (TARGET=1, LAYOUT=9)
+# Source: defines_2-1-9.h
+# GD32F130 LAYOUT 9 — Halls on PB11/PA1/PA0, LED_GREEN on PA5 (unusual).
+# Note: BLDC G/B/Y → U/V/W naming swapped vs LAYOUT 1-1, but physical pin pairs
+# (PA8/PB13, PA9/PB14, PA10/PB15) are identical. We use phase position not color name.
+
+[meta]
+name = "RoboDurden Gen2.x-GD32 LAYOUT 1-9 (G=U convention, PA5 led_green)"
+source = "imported-from-RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32"
+notes = "BLDC pin macros use G=U/B=V/Y=W convention (opposite of LAYOUT 1-1's Y=U/B=V/G=W). Physical pins identical. LED_GREEN on unusual PA5."
+confidence = 1.0
+
+[chip]
+family = "GD32F1"
+part_hint = "GD32F130C8T6"
+
+[power]
+self_hold = "PB2"
+self_hold_active_high = true
+
+[halls_right]
+hall_a = "PB11"
+hall_b = "PA1"
+hall_c = "PA0"
+
+[phases_right]
+timer = "TIMER0"
+u_high = "PA8"
+u_low = "PB13"
+v_high = "PA9"
+v_low = "PB14"
+w_high = "PA10"
+w_low = "PB15"
+dead_time_ns = 833
+
+[indicators]
+led_green = "PA5"
+led_red = "PB3"
+led_orange = "PA14"
+buzzer = "PB9"
+
+[inputs]
+button = "PC14"
+button_active_low = true
+
+[sensing.battery_voltage]
+adc_unit = 1
+channel = 4
+on_pin = { port = "A", pin = 4 }
+divider = 13.0
+
+[sensing.left_phase_current]
+adc_unit = 1
+channel = 6
+on_pin = { port = "A", pin = 6 }
+shunt_resistor_milliohms = 1.0

@@ -1,0 +1,57 @@
+# Captured from RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32 (TARGET=1, LAYOUT=5)
+# Source: defines_2-1-5.h
+# WARNING: The header has BLDC_BL=PB4 conflicting with HALL_C=PB4. We record HALL_C
+# (more confident — halls are inputs, can't share with active phase output) and
+# drop the v_low phase assignment. The actual board likely has v_low on a
+# different pin not captured in the header. Verify against PCB before use.
+
+[meta]
+name = "RoboDurden Gen2.x-GD32 LAYOUT 1-5 (PC LEDs variant — has pin conflict)"
+source = "imported-from-RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32"
+notes = "Hall pins on PB0/PB5/PB4. LEDs on PC13-15. Header has BLDC_BL/HALL_C conflict on PB4 — dropped v_low to keep hall_c. Verify v_low pin from PCB."
+confidence = 0.7
+
+[chip]
+family = "GD32F1"
+part_hint = "GD32F130C8T6"
+
+[power]
+self_hold = "PA6"
+self_hold_active_high = true
+
+[halls_right]
+hall_a = "PB0"
+hall_b = "PB5"
+hall_c = "PB4"
+
+[phases_right]
+timer = "TIMER0"
+u_high = "PA8"
+u_low = "PB13"
+v_high = "PA9"
+# v_low intentionally omitted — header conflicts with HALL_C
+w_high = "PA10"
+w_low = "PB15"
+dead_time_ns = 833
+
+[indicators]
+led_red = "PC13"
+led_orange = "PC14"
+led_green = "PC15"
+buzzer = "PB8"
+
+[inputs]
+button = "PA5"
+button_active_low = true
+
+[sensing.battery_voltage]
+adc_unit = 1
+channel = 0
+on_pin = { port = "A", pin = 0 }
+divider = 13.0
+
+[sensing.left_phase_current]
+adc_unit = 1
+channel = 1
+on_pin = { port = "A", pin = 1 }
+shunt_resistor_milliohms = 1.0

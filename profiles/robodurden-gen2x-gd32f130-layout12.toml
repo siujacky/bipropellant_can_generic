@@ -1,0 +1,56 @@
+# Captured from RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32 (TARGET=1, LAYOUT=12)
+# Source: defines_2-1-12.h
+# GD32F130 — hall pins PB11/PC14/PA1, buzzer on PA12.
+
+[meta]
+name = "RoboDurden Gen2.x-GD32 LAYOUT 1-12 (PA1 hall_c, PA12 buzzer)"
+source = "imported-from-RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32"
+notes = "Like LAYOUT 1-6 with buzzer relocated to PA12 instead of PB9."
+confidence = 1.0
+
+[chip]
+family = "GD32F1"
+part_hint = "GD32F130C8T6"
+
+[power]
+self_hold = "PB2"
+self_hold_active_high = true
+
+[halls_right]
+hall_a = "PB11"
+hall_b = "PC14"
+hall_c = "PA1"
+
+[phases_right]
+timer = "TIMER0"
+u_high = "PA8"
+u_low = "PB13"
+v_high = "PA9"
+v_low = "PB14"
+w_high = "PA10"
+w_low = "PB15"
+dead_time_ns = 833
+
+[indicators]
+led_orange = "PA15"
+led_green = "PB3"
+led_red = "PB4"
+buzzer = "PA12"
+
+[inputs]
+button = "PA5"
+button_active_low = true
+charger_detect = "PC15"
+charger_active_low = true
+
+[sensing.battery_voltage]
+adc_unit = 1
+channel = 4
+on_pin = { port = "A", pin = 4 }
+divider = 13.0
+
+[sensing.left_phase_current]
+adc_unit = 1
+channel = 6
+on_pin = { port = "A", pin = 6 }
+shunt_resistor_milliohms = 1.0
