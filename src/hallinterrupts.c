@@ -20,6 +20,7 @@
 #include "stm32f1xx_hal.h"
 #include "defines.h"
 #include "config.h"
+#include "board_active.h"
 #include "hallinterrupts.h"
 #include <string.h>
 #include "control_structures.h"
@@ -247,24 +248,24 @@ void HallInterruptsInterrupt(void){
     int64_t timerwraps_copy = timerwraps;
 
 #if (SWITCH_WHEELS == 0)
-    local_hall_params[1].hall = (~(LEFT_HALL_U_PORT->IDR & (LEFT_HALL_U_PIN | LEFT_HALL_V_PIN | LEFT_HALL_W_PIN))/LEFT_HALL_U_PIN) & 7;
-    local_hall_params[0].hall = (~(RIGHT_HALL_U_PORT->IDR & (RIGHT_HALL_U_PIN | RIGHT_HALL_V_PIN | RIGHT_HALL_W_PIN))/RIGHT_HALL_U_PIN) & 7;
+    local_hall_params[1].hall = (~(BOARD_GP_PORT(ACTIVE.halls_left.hall_a, LEFT_HALL_U_PORT)->IDR & (BOARD_GP_MASK(ACTIVE.halls_left.hall_a, LEFT_HALL_U_PIN) | BOARD_GP_MASK(ACTIVE.halls_left.hall_b, LEFT_HALL_V_PIN) | BOARD_GP_MASK(ACTIVE.halls_left.hall_c, LEFT_HALL_W_PIN)))/BOARD_GP_MASK(ACTIVE.halls_left.hall_a, LEFT_HALL_U_PIN)) & 7;
+    local_hall_params[0].hall = (~(BOARD_GP_PORT(ACTIVE.halls_right.hall_a, RIGHT_HALL_U_PORT)->IDR & (BOARD_GP_MASK(ACTIVE.halls_right.hall_a, RIGHT_HALL_U_PIN) | BOARD_GP_MASK(ACTIVE.halls_right.hall_b, RIGHT_HALL_V_PIN) | BOARD_GP_MASK(ACTIVE.halls_right.hall_c, RIGHT_HALL_W_PIN)))/BOARD_GP_MASK(ACTIVE.halls_right.hall_a, RIGHT_HALL_U_PIN)) & 7;
 #else
-    local_hall_params[0].hall = (~(LEFT_HALL_U_PORT->IDR & (LEFT_HALL_U_PIN | LEFT_HALL_V_PIN | LEFT_HALL_W_PIN))/LEFT_HALL_U_PIN) & 7;
-    local_hall_params[1].hall = (~(RIGHT_HALL_U_PORT->IDR & (RIGHT_HALL_U_PIN | RIGHT_HALL_V_PIN | RIGHT_HALL_W_PIN))/RIGHT_HALL_U_PIN) & 7;
+    local_hall_params[0].hall = (~(BOARD_GP_PORT(ACTIVE.halls_left.hall_a, LEFT_HALL_U_PORT)->IDR & (BOARD_GP_MASK(ACTIVE.halls_left.hall_a, LEFT_HALL_U_PIN) | BOARD_GP_MASK(ACTIVE.halls_left.hall_b, LEFT_HALL_V_PIN) | BOARD_GP_MASK(ACTIVE.halls_left.hall_c, LEFT_HALL_W_PIN)))/BOARD_GP_MASK(ACTIVE.halls_left.hall_a, LEFT_HALL_U_PIN)) & 7;
+    local_hall_params[1].hall = (~(BOARD_GP_PORT(ACTIVE.halls_right.hall_a, RIGHT_HALL_U_PORT)->IDR & (BOARD_GP_MASK(ACTIVE.halls_right.hall_a, RIGHT_HALL_U_PIN) | BOARD_GP_MASK(ACTIVE.halls_right.hall_b, RIGHT_HALL_V_PIN) | BOARD_GP_MASK(ACTIVE.halls_right.hall_c, RIGHT_HALL_W_PIN)))/BOARD_GP_MASK(ACTIVE.halls_right.hall_a, RIGHT_HALL_U_PIN)) & 7;
 #endif
 
-    unsigned short Left = LEFT_HALL_U_PORT->IDR;
-    unsigned short Right = RIGHT_HALL_U_PORT->IDR;
+    unsigned short Left = BOARD_GP_PORT(ACTIVE.halls_left.hall_a, LEFT_HALL_U_PORT)->IDR;
+    unsigned short Right = BOARD_GP_PORT(ACTIVE.halls_right.hall_a, RIGHT_HALL_U_PORT)->IDR;
 
     // Get hall sensors values
-    hall_ul = !(Left & LEFT_HALL_U_PIN);
-    hall_vl = !(Left & LEFT_HALL_V_PIN);
-    hall_wl = !(Left & LEFT_HALL_W_PIN);
+    hall_ul = !(Left & BOARD_GP_MASK(ACTIVE.halls_left.hall_a, LEFT_HALL_U_PIN));
+    hall_vl = !(Left & BOARD_GP_MASK(ACTIVE.halls_left.hall_b, LEFT_HALL_V_PIN));
+    hall_wl = !(Left & BOARD_GP_MASK(ACTIVE.halls_left.hall_c, LEFT_HALL_W_PIN));
 
-    hall_ur = !(Right & RIGHT_HALL_U_PIN);
-    hall_vr = !(Right & RIGHT_HALL_V_PIN);
-    hall_wr = !(Right & RIGHT_HALL_W_PIN);
+    hall_ur = !(Right & BOARD_GP_MASK(ACTIVE.halls_right.hall_a, RIGHT_HALL_U_PIN));
+    hall_vr = !(Right & BOARD_GP_MASK(ACTIVE.halls_right.hall_b, RIGHT_HALL_V_PIN));
+    hall_wr = !(Right & BOARD_GP_MASK(ACTIVE.halls_right.hall_c, RIGHT_HALL_W_PIN));
     __enable_irq();
 
     for (int i = 0; i < 2; i++){

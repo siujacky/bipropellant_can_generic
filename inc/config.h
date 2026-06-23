@@ -250,7 +250,34 @@
   #define FLASH_DEFAULT_HOVERBOARD_ENABLE 0
 #endif
 
-#define CURRENT_MAGIC 1238
+// Bumped from 1238 for the board-generic FLASH_CONTENT extension (M2/M4):
+// old flash images now fail the magic check -> load FlashDefaults -> new
+// board-override fields zero-init -> board_override_valid=0 -> fall back to
+// the default-safe (motor-disabled) profile.
+#define CURRENT_MAGIC 1239
+
+// ############################### UNIVERSAL FIRMWARE: BOARD FAMILY / SELECTION ###############################
+// This binary is compiled for ONE chip family at a time. BOARD_FAMILY is the
+// build-time family token; it selects which family-filtered board_table rows
+// are linked in (see generated/). The value matches the board_family_t enum
+// in board_table.h (BOARD_FAMILY_STM32F1 == 0), so set it numerically here to
+// avoid colliding with that enum constant in the preprocessor.
+//   BOARD_FAMILY_TOKEN_STM32F1   = 0
+//   BOARD_FAMILY_TOKEN_GD32F1    = 1
+//   BOARD_FAMILY_TOKEN_GD32E2    = 3
+//   BOARD_FAMILY_TOKEN_MM32SPIN0X = 4
+#define BOARD_FAMILY_TOKEN_STM32F1    0
+#define BOARD_FAMILY_TOKEN_GD32F1     1
+#define BOARD_FAMILY_TOKEN_GD32E2     3
+#define BOARD_FAMILY_TOKEN_MM32SPIN0X 4
+#ifndef BOARD_FAMILY
+  #define BOARD_FAMILY BOARD_FAMILY_TOKEN_STM32F1
+#endif
+// Index into g_board_table[] used as the boot-time safe default. Points at the
+// MOTOR-DISABLED safe row so a fresh/unconfigured unit cannot energize phases.
+#ifndef DEFAULT_BOARD_INDEX
+  #define DEFAULT_BOARD_INDEX 0
+#endif
 
 // ############################### ENABLE INTERRUPT READING OF HALL SENSORS FOR POSITION ###############################
 #ifndef HALL_INTERRUPTS

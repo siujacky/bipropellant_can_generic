@@ -15,6 +15,8 @@ void forceLog(char *message) {
 #include "flashcontent.h"
 #include "control_structures.h"
 #include "hbprotocol/protocol.h"  // For CONTROL_TYPE_* defines
+#include "board_override.h"        // board_apply_override / commit / select-force
+#include "board_table.h"           // gpio_pin_t, board_override_result_t
 #include <string.h>
 #include <stdio.h>
 
@@ -42,15 +44,24 @@ bool CAN_IsSoftwareSerialReady(void) {
 #define CAN_CMD_SPEED_OFFSET     0x01
 #define CAN_CMD_POSITION_OFFSET  0x02
 #define CAN_CMD_ENABLE_OFFSET    0x03
+/* Board configuration commands (universal-firmware board select/override, M4) */
+#define CAN_CMD_BOARD_SELECT_OFFSET   0x04  // data[0..1]=row index (LE) -> serial-forced select
+#define CAN_CMD_BOARD_OVERRIDE_OFFSET 0x05  // data[0]=field_id, data[1]=port, data[2]=pin
+#define CAN_CMD_BOARD_COMMIT_OFFSET   0x06  // persist current override set to flash
 #define CAN_STATUS_SPEED_OFFSET  0x00
 #define CAN_STATUS_POS_OFFSET    0x01
 #define CAN_STATUS_BATT_OFFSET   0x02
 #define CAN_STATUS_BOOTUP_OFFSET 0x0F  // Boot announcement message
+#define CAN_STATUS_BOARD_OFFSET  0x0E  // board command result reply (1 byte = override_result_t)
 
 static uint32_t can_cmd_pwm;
 static uint32_t can_cmd_speed;
 static uint32_t can_cmd_position;
 static uint32_t can_cmd_enable;
+static uint32_t can_cmd_board_select;
+static uint32_t can_cmd_board_override;
+static uint32_t can_cmd_board_commit;
+static uint32_t can_status_board;
 static uint32_t can_status_speed;
 static uint32_t can_status_pos;
 static uint32_t can_status_batt;
@@ -99,12 +110,16 @@ static void CAN_Init_IDs(void) {
     can_cmd_speed = cmd_base + offset + CAN_CMD_SPEED_OFFSET;
     can_cmd_position = cmd_base + offset + CAN_CMD_POSITION_OFFSET;
     can_cmd_enable = cmd_base + offset + CAN_CMD_ENABLE_OFFSET;
-    
+    can_cmd_board_select   = cmd_base + offset + CAN_CMD_BOARD_SELECT_OFFSET;
+    can_cmd_board_override = cmd_base + offset + CAN_CMD_BOARD_OVERRIDE_OFFSET;
+    can_cmd_board_commit   = cmd_base + offset + CAN_CMD_BOARD_COMMIT_OFFSET;
+
     // Status IDs
     can_status_speed = status_base + offset + CAN_STATUS_SPEED_OFFSET;
     can_status_pos = status_base + offset + CAN_STATUS_POS_OFFSET;
     can_status_batt = status_base + offset + CAN_STATUS_BATT_OFFSET;
     can_status_bootup = status_base + offset + CAN_STATUS_BOOTUP_OFFSET;
+    can_status_board = status_base + offset + CAN_STATUS_BOARD_OFFSET;
 }
 
 // Function to detect MCP2515 and initialize CAN bus
@@ -224,6 +239,19 @@ void CAN_Fallback_To_USART(void) {
 #ifdef SERIAL_USART3_IT
     USART3_IT_init();
 #endif
+}
+
+// Send a 1-byte board-command result reply (override_result_t value).
+static void CAN_SendBoardResult(uint8_t result) {
+    CAN_Frame tx_frame;
+    tx_frame.id = can_status_board;
+    tx_frame.extended = false;
+    tx_frame.rtr = false;
+    tx_frame.dlc = 1;
+    tx_frame.data[0] = result;
+    if (MCP2515_SendFrame(&tx_frame)) {
+        can_stats.tx_total++;
+    }
 }
 
 // Process incoming CAN messages
@@ -404,7 +432,45 @@ void CAN_ProcessMessages(void) {
                         forceLog(" -> Motors DISABLED\r\n");
                     }
                 }
-            } else {
+            }
+            else if (rx_frame.id == can_cmd_board_select) {
+                // Board selection: data[0..1] = g_board_table row index (LE).
+                // Serial/CAN-forced selection; takes effect on next boot resolve.
+                forceLog(" [BOARD SELECT]");
+                if (rx_frame.dlc >= 2) {
+                    uint16_t idx = (uint16_t)(rx_frame.data[0] |
+                                              ((uint16_t)rx_frame.data[1] << 8));
+                    board_select_force(idx);
+                    FlashContent.board_selected_index = idx;
+                    FlashContent.board_select_mode    = BOARD_SELECT_SERIAL_FORCED;
+                    FlashContent.board_override_valid = 1;
+                    sprintf(msg, " idx=%u (pending reboot)", (unsigned)idx);
+                    forceLog(msg);
+                    // PENDING_REBOOT: base-row change only applies on next resolve.
+                    CAN_SendBoardResult((uint8_t)PENDING_REBOOT);
+                }
+            }
+            else if (rx_frame.id == can_cmd_board_override) {
+                // Pin override: data[0]=field_id, data[1]=port(0..7), data[2]=pin(0..15)
+                forceLog(" [BOARD OVERRIDE]");
+                if (rx_frame.dlc >= 3) {
+                    uint8_t field_id = rx_frame.data[0];
+                    gpio_pin_t newpin = { rx_frame.data[1], rx_frame.data[2] };
+                    override_result_t r = board_apply_override(field_id, newpin);
+                    sprintf(msg, " field=%u %u:%u -> %d",
+                            field_id, newpin.port, newpin.pin, (int)r);
+                    forceLog(msg);
+                    CAN_SendBoardResult((uint8_t)r);
+                }
+            }
+            else if (rx_frame.id == can_cmd_board_commit) {
+                // Persist current override set to flash (reuses FlashContent path).
+                forceLog(" [BOARD COMMIT]");
+                int ok = board_override_commit();
+                CAN_SendBoardResult(ok ? (uint8_t)APPLIED_LIVE
+                                       : (uint8_t)REJECTED_CONFLICT);
+            }
+            else {
                 can_stats.rx_unknown++;
                 forceLog(" [UNKNOWN]");
             }

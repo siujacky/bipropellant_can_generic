@@ -20,6 +20,7 @@
 #include "stm32f1xx_hal.h"
 #include "defines.h"
 #include "config.h"
+#include "board_active.h"
 
 
 #ifdef CONTROL_SENSOR
@@ -252,8 +253,8 @@ int immediate_stm32(PROTOCOL_STAT *s, char byte, char *ascii_out) {
         "A:%04X B:%04X C:%04X D:%04X E:%04X\r\n"\
         "Button: %d Charge:%d\r\n",
         (int)GPIOA->IDR, (int)GPIOB->IDR, (int)GPIOC->IDR, (int)GPIOD->IDR, (int)GPIOE->IDR,
-        (int)(BUTTON_PORT->IDR & BUTTON_PIN)?1:0,
-        (int)(CHARGER_PORT->IDR & CHARGER_PIN)?1:0
+        (int)BOARD_GPIO_READ(ACTIVE.button, BUTTON_PORT, BUTTON_PIN)?1:0,
+        (int)BOARD_GPIO_READ(ACTIVE.charger, CHARGER_PORT, CHARGER_PIN)?1:0
     );
     return 1;
 }

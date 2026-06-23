@@ -58,7 +58,11 @@ src/BLDC_controller_data.c \
 src/BLDC_controller.c \
 src/mcp2515.c \
 src/software_spi.c \
-src/can_bus.c
+src/can_bus.c \
+src/board_select.c \
+src/board_override.c \
+generated/board_table_stm32f1.c \
+generated/board_af_validity_stm32f1.c
 
 
 # ASM sources
@@ -108,6 +112,7 @@ AS_INCLUDES =
 # C includes
 C_INCLUDES =  \
 -Iinc \
+-Igenerated \
 -Isrc/hbprotocol \
 -IDrivers/STM32F1xx_HAL_Driver/Inc \
 -IDrivers/STM32F1xx_HAL_Driver/Inc/Legacy \

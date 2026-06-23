@@ -40,6 +40,7 @@ pb10 usart3 dma1 channel2/3
 #include "comms.h"
 #include <string.h>
 #include "protocolfunctions.h"
+#include "board_active.h"
 
 TIM_HandleTypeDef htim_right;
 TIM_HandleTypeDef htim_left;
@@ -336,23 +337,12 @@ void MX_GPIO_Init(void) {
     GPIO_InitStruct.Mode  = GPIO_MODE_IT_RISING_FALLING;
 
 
-  GPIO_InitStruct.Pin = LEFT_HALL_U_PIN;
-  HAL_GPIO_Init(LEFT_HALL_U_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = LEFT_HALL_V_PIN;
-  HAL_GPIO_Init(LEFT_HALL_V_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = LEFT_HALL_W_PIN;
-  HAL_GPIO_Init(LEFT_HALL_W_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = RIGHT_HALL_U_PIN;
-  HAL_GPIO_Init(RIGHT_HALL_U_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = RIGHT_HALL_V_PIN;
-  HAL_GPIO_Init(RIGHT_HALL_V_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = RIGHT_HALL_W_PIN;
-  HAL_GPIO_Init(RIGHT_HALL_W_PORT, &GPIO_InitStruct);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.halls_left.hall_a,  LEFT_HALL_U_PORT,  LEFT_HALL_U_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.halls_left.hall_b,  LEFT_HALL_V_PORT,  LEFT_HALL_V_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.halls_left.hall_c,  LEFT_HALL_W_PORT,  LEFT_HALL_W_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.halls_right.hall_a, RIGHT_HALL_U_PORT, RIGHT_HALL_U_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.halls_right.hall_b, RIGHT_HALL_V_PORT, RIGHT_HALL_V_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.halls_right.hall_c, RIGHT_HALL_W_PORT, RIGHT_HALL_W_PIN);
   ////////////////////////////////////////////////////
 
 
@@ -364,8 +354,7 @@ void MX_GPIO_Init(void) {
   GPIO_InitStruct.Mode  = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull  = GPIO_PULLUP;
 
-  GPIO_InitStruct.Pin = CHARGER_PIN;
-  HAL_GPIO_Init(CHARGER_PORT, &GPIO_InitStruct);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.charger, CHARGER_PORT, CHARGER_PIN);
   ////////////////////////////////////////////////////
 
 
@@ -378,8 +367,7 @@ void MX_GPIO_Init(void) {
   GPIO_InitStruct.Mode  = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull  = GPIO_NOPULL;
 
-  GPIO_InitStruct.Pin = BUTTON_PIN;
-  HAL_GPIO_Init(BUTTON_PORT, &GPIO_InitStruct);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.button, BUTTON_PORT, BUTTON_PIN);
   ////////////////////////////////////////////////////
 
 
@@ -391,14 +379,9 @@ void MX_GPIO_Init(void) {
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   GPIO_InitStruct.Pull  = GPIO_NOPULL;
 
-  GPIO_InitStruct.Pin = LED_PIN;
-  HAL_GPIO_Init(LED_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = BUZZER_PIN;
-  HAL_GPIO_Init(BUZZER_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = OFF_PIN;
-  HAL_GPIO_Init(OFF_PORT, &GPIO_InitStruct);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.led_green, LED_PORT,    LED_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.buzzer,    BUZZER_PORT, BUZZER_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.self_hold, OFF_PORT,    OFF_PIN);
   ////////////////////////////////////////////////////
 
 
@@ -410,26 +393,17 @@ void MX_GPIO_Init(void) {
   GPIO_InitStruct.Pull  = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 
-  GPIO_InitStruct.Pin = LEFT_DC_CUR_PIN;
-  HAL_GPIO_Init(LEFT_DC_CUR_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = LEFT_U_CUR_PIN;
-  HAL_GPIO_Init(LEFT_U_CUR_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = LEFT_V_CUR_PIN;
-  HAL_GPIO_Init(LEFT_V_CUR_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = RIGHT_DC_CUR_PIN;
-  HAL_GPIO_Init(RIGHT_DC_CUR_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = RIGHT_U_CUR_PIN;
-  HAL_GPIO_Init(RIGHT_U_CUR_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = RIGHT_V_CUR_PIN;
-  HAL_GPIO_Init(RIGHT_V_CUR_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = DCLINK_PIN;
-  HAL_GPIO_Init(DCLINK_PORT, &GPIO_InitStruct);
+  // Analog/current-sense GPIOs. The four adc_chan_t.on_pin fields carry the
+  // ACTIVE-sourced analog pins; layout-specific extras with no dedicated schema
+  // slot keep the defines.h default (sentinel literal -> fallback). For the
+  // all-sentinel safe-default row every line resolves to the defines.h pin.
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.left_phase_current.on_pin,  LEFT_DC_CUR_PORT,  LEFT_DC_CUR_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ((gpio_pin_t){0xFF,0xFF}),         LEFT_U_CUR_PORT,   LEFT_U_CUR_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ((gpio_pin_t){0xFF,0xFF}),         LEFT_V_CUR_PORT,   LEFT_V_CUR_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.right_phase_current.on_pin, RIGHT_DC_CUR_PORT, RIGHT_DC_CUR_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ((gpio_pin_t){0xFF,0xFF}),         RIGHT_U_CUR_PORT,  RIGHT_U_CUR_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ((gpio_pin_t){0xFF,0xFF}),         RIGHT_V_CUR_PORT,  RIGHT_V_CUR_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.dc_link_voltage.on_pin,     DCLINK_PORT,       DCLINK_PIN);
 
   //Analog in
   GPIO_InitStruct.Pin = GPIO_PIN_3;
@@ -448,41 +422,21 @@ void MX_GPIO_Init(void) {
   GPIO_InitStruct.Pull  = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 
-  GPIO_InitStruct.Pin = LEFT_TIM_UH_PIN;
-  HAL_GPIO_Init(LEFT_TIM_UH_PORT, &GPIO_InitStruct);
+  // LEFT motor phase GPIOs (ACTIVE.phases_left; sentinel -> defines.h default).
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.phases_left.u_high,  LEFT_TIM_UH_PORT, LEFT_TIM_UH_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.phases_left.v_high,  LEFT_TIM_VH_PORT, LEFT_TIM_VH_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.phases_left.w_high,  LEFT_TIM_WH_PORT, LEFT_TIM_WH_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.phases_left.u_low,   LEFT_TIM_UL_PORT, LEFT_TIM_UL_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.phases_left.v_low,   LEFT_TIM_VL_PORT, LEFT_TIM_VL_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.phases_left.w_low,   LEFT_TIM_WL_PORT, LEFT_TIM_WL_PIN);
 
-  GPIO_InitStruct.Pin = LEFT_TIM_VH_PIN;
-  HAL_GPIO_Init(LEFT_TIM_VH_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = LEFT_TIM_WH_PIN;
-  HAL_GPIO_Init(LEFT_TIM_WH_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = LEFT_TIM_UL_PIN;
-  HAL_GPIO_Init(LEFT_TIM_UL_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = LEFT_TIM_VL_PIN;
-  HAL_GPIO_Init(LEFT_TIM_VL_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = LEFT_TIM_WL_PIN;
-  HAL_GPIO_Init(LEFT_TIM_WL_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = RIGHT_TIM_UH_PIN;
-  HAL_GPIO_Init(RIGHT_TIM_UH_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = RIGHT_TIM_VH_PIN;
-  HAL_GPIO_Init(RIGHT_TIM_VH_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = RIGHT_TIM_WH_PIN;
-  HAL_GPIO_Init(RIGHT_TIM_WH_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = RIGHT_TIM_UL_PIN;
-  HAL_GPIO_Init(RIGHT_TIM_UL_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = RIGHT_TIM_VL_PIN;
-  HAL_GPIO_Init(RIGHT_TIM_VL_PORT, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = RIGHT_TIM_WL_PIN;
-  HAL_GPIO_Init(RIGHT_TIM_WL_PORT, &GPIO_InitStruct);
+  // RIGHT motor phase GPIOs (ACTIVE.phases_right; sentinel -> defines.h default).
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.phases_right.u_high, RIGHT_TIM_UH_PORT, RIGHT_TIM_UH_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.phases_right.v_high, RIGHT_TIM_VH_PORT, RIGHT_TIM_VH_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.phases_right.w_high, RIGHT_TIM_WH_PORT, RIGHT_TIM_WH_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.phases_right.u_low,  RIGHT_TIM_UL_PORT, RIGHT_TIM_UL_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.phases_right.v_low,  RIGHT_TIM_VL_PORT, RIGHT_TIM_VL_PIN);
+  BOARD_GPIO_INIT(&GPIO_InitStruct, ACTIVE.phases_right.w_low,  RIGHT_TIM_WL_PORT, RIGHT_TIM_WL_PIN);
   ///////////////////////////////////////////////////
 }
 
