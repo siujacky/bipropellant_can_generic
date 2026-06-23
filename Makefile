@@ -118,7 +118,11 @@ C_INCLUDES =  \
 # compile gcc flags
 ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
 
-CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections -std=gnu11
+# -fcommon: this firmware predates GCC 10's -fno-common default and relies on
+# merged tentative definitions (rtP, hdma_i2c2_*) across translation units.
+# Without it modern arm-none-eabi-gcc (>=10) fails to link with "multiple
+# definition" errors. (PlatformIO's older toolchain defaulted to -fcommon.)
+CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections -fcommon -std=gnu11
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -gdwarf-2
