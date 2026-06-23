@@ -38,6 +38,7 @@
 #include "control_structures.h"
 #include "board_active.h"
 #include "board_override.h"
+#include "phasemap.h"
 
 #ifdef ENABLE_CAN_BUS
 #include "can_bus.h"
@@ -549,7 +550,13 @@ int main(void) {
       #if (INCLUDE_PROTOCOL == INCLUDE_PROTOCOL2)
         #ifdef SOFTWARE_SERIAL
           while ( softwareserial_available() > 0 ) {
-            protocol_byte( &sSoftwareSerial, (unsigned char) softwareserial_getrx() );
+            unsigned char rxc = (unsigned char) softwareserial_getrx();
+            /* Route single chars to phasemap wizard when it is waiting for input */
+            if (phasemap_state() != PM_IDLE && phasemap_state() != PM_DONE &&
+                phasemap_state() != PM_ABORTED) {
+              phasemap_char((char)rxc);
+            }
+            protocol_byte( &sSoftwareSerial, rxc );
           }
           protocol_tick( &sSoftwareSerial );
         #endif
@@ -558,7 +565,12 @@ int main(void) {
           // if we enabled USART2 as protocol from power button at startup
           if (USART2ProtocolEnable) {
             while ( serial_usart_buffer_count(&usart2_it_RXbuffer) > 0 ) {
-              protocol_byte( &sUSART2, (unsigned char) serial_usart_buffer_pop(&usart2_it_RXbuffer) );
+              unsigned char rxc = (unsigned char) serial_usart_buffer_pop(&usart2_it_RXbuffer);
+              if (phasemap_state() != PM_IDLE && phasemap_state() != PM_DONE &&
+                  phasemap_state() != PM_ABORTED) {
+                phasemap_char((char)rxc);
+              }
+              protocol_byte( &sUSART2, rxc );
             }
             protocol_tick( &sUSART2 );
           }
@@ -566,18 +578,28 @@ int main(void) {
 
         #if defined(SERIAL_USART2_IT) && !defined(CONTROL_SENSOR)
           while ( serial_usart_buffer_count(&usart2_it_RXbuffer) > 0 ) {
-            protocol_byte( &sUSART2, (unsigned char) serial_usart_buffer_pop(&usart2_it_RXbuffer) );
+            unsigned char rxc = (unsigned char) serial_usart_buffer_pop(&usart2_it_RXbuffer);
+            if (phasemap_state() != PM_IDLE && phasemap_state() != PM_DONE &&
+                phasemap_state() != PM_ABORTED) {
+              phasemap_char((char)rxc);
+            }
+            protocol_byte( &sUSART2, rxc );
           }
           protocol_tick( &sUSART2 );
         #endif
 
         #if defined(SERIAL_USART3_IT) && !defined(CONTROL_SENSOR)
           while ( serial_usart_buffer_count(&usart3_it_RXbuffer) > 0 ) {
-            protocol_byte( &sUSART3, (unsigned char) serial_usart_buffer_pop(&usart3_it_RXbuffer) );
+            unsigned char rxc = (unsigned char) serial_usart_buffer_pop(&usart3_it_RXbuffer);
+            if (phasemap_state() != PM_IDLE && phasemap_state() != PM_DONE &&
+                phasemap_state() != PM_ABORTED) {
+              phasemap_char((char)rxc);
+            }
+            protocol_byte( &sUSART3, rxc );
           }
           protocol_tick( &sUSART3 );
         #endif
-        
+
         #ifdef ENABLE_CAN_BUS
           // Process CAN bus messages if in CAN mode
           CAN_ProcessMessages();
@@ -595,6 +617,11 @@ int main(void) {
 
     // read last DMAed ADC values, moved from bldc interrupt to non interrupt.
     readADCs();
+
+    /* PhaseMap Wizard tick — advances the state machine once per main loop
+     * iteration.  Safe to call at all times: returns immediately in PM_IDLE,
+     * PM_DONE, and PM_ABORTED states.  Never call from an ISR context. */
+    phasemap_tick();
 
     /////////////////////////////////////
     // proceesing starts after we hit 5ms interval

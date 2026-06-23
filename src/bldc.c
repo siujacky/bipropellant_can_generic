@@ -34,8 +34,6 @@ RT_MODEL rtM_Right_;   /* Real-time model */
 RT_MODEL *const rtM_Left = &rtM_Left_;
 RT_MODEL *const rtM_Right = &rtM_Right_;
 
-P rtP;                           /* Block parameters (auto storage) */
-
 DW rtDW_Left;                    /* Observable states */
 ExtU rtU_Left;                   /* External inputs */
 ExtY rtY_Left;                   /* External outputs */

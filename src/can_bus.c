@@ -1,6 +1,7 @@
 #include "can_bus.h"
 #include "config.h"
 #include "comms.h"
+#include "phasemap.h"
 
 // Force output regardless of debug_out flag (RAW output, no protocol framing)
 void forceLog(char *message) {
@@ -48,6 +49,14 @@ bool CAN_IsSoftwareSerialReady(void) {
 #define CAN_CMD_BOARD_SELECT_OFFSET   0x04  // data[0..1]=row index (LE) -> serial-forced select
 #define CAN_CMD_BOARD_OVERRIDE_OFFSET 0x05  // data[0]=field_id, data[1]=port, data[2]=pin
 #define CAN_CMD_BOARD_COMMIT_OFFSET   0x06  // persist current override set to flash
+/* PhaseMap Wizard command offsets (board_base + offset) */
+#define CAN_CMD_PHASEMAP_START_OFFSET   0x20  // data[0]=mode (0=GUIDED,1=AUTO_ADC)
+#define CAN_CMD_PHASEMAP_CONFIRM_OFFSET 0x21  // signals "CONFIRM DUMMY LOAD" in GUIDED mode
+#define CAN_CMD_PHASEMAP_CHAR_OFFSET    0x22  // data[0]=char (y/n/s/q)
+#define CAN_CMD_PHASEMAP_ABORT_OFFSET   0x23  // calls phasemap_abort()
+/* PhaseMap Wizard status offsets */
+#define CAN_STATUS_PHASEMAP_OFFSET      0x30  // data[0]=state, data[1]=probe_idx, data[2]=total_confirmed
+#define CAN_STATUS_PHASEMAP_PROBE_OFFSET 0x31 // data[0]=port, data[1]=pin, data[2]=confirmed, data[3..5]=droop_mv LE
 #define CAN_STATUS_SPEED_OFFSET  0x00
 #define CAN_STATUS_POS_OFFSET    0x01
 #define CAN_STATUS_BATT_OFFSET   0x02
@@ -61,11 +70,17 @@ static uint32_t can_cmd_enable;
 static uint32_t can_cmd_board_select;
 static uint32_t can_cmd_board_override;
 static uint32_t can_cmd_board_commit;
+static uint32_t can_cmd_phasemap_start;
+static uint32_t can_cmd_phasemap_confirm;
+static uint32_t can_cmd_phasemap_char;
+static uint32_t can_cmd_phasemap_abort;
 static uint32_t can_status_board;
 static uint32_t can_status_speed;
 static uint32_t can_status_pos;
 static uint32_t can_status_batt;
 static uint32_t can_status_bootup;
+static uint32_t can_status_phasemap;
+static uint32_t can_status_phasemap_probe;
 
 // External flash content
 extern FLASH_CONTENT FlashContent;
@@ -113,6 +128,11 @@ static void CAN_Init_IDs(void) {
     can_cmd_board_select   = cmd_base + offset + CAN_CMD_BOARD_SELECT_OFFSET;
     can_cmd_board_override = cmd_base + offset + CAN_CMD_BOARD_OVERRIDE_OFFSET;
     can_cmd_board_commit   = cmd_base + offset + CAN_CMD_BOARD_COMMIT_OFFSET;
+    /* PhaseMap Wizard command IDs */
+    can_cmd_phasemap_start   = cmd_base + offset + CAN_CMD_PHASEMAP_START_OFFSET;
+    can_cmd_phasemap_confirm = cmd_base + offset + CAN_CMD_PHASEMAP_CONFIRM_OFFSET;
+    can_cmd_phasemap_char    = cmd_base + offset + CAN_CMD_PHASEMAP_CHAR_OFFSET;
+    can_cmd_phasemap_abort   = cmd_base + offset + CAN_CMD_PHASEMAP_ABORT_OFFSET;
 
     // Status IDs
     can_status_speed = status_base + offset + CAN_STATUS_SPEED_OFFSET;
@@ -120,6 +140,9 @@ static void CAN_Init_IDs(void) {
     can_status_batt = status_base + offset + CAN_STATUS_BATT_OFFSET;
     can_status_bootup = status_base + offset + CAN_STATUS_BOOTUP_OFFSET;
     can_status_board = status_base + offset + CAN_STATUS_BOARD_OFFSET;
+    /* PhaseMap Wizard status IDs */
+    can_status_phasemap       = status_base + offset + CAN_STATUS_PHASEMAP_OFFSET;
+    can_status_phasemap_probe = status_base + offset + CAN_STATUS_PHASEMAP_PROBE_OFFSET;
 }
 
 // Function to detect MCP2515 and initialize CAN bus
@@ -239,6 +262,48 @@ void CAN_Fallback_To_USART(void) {
 #ifdef SERIAL_USART3_IT
     USART3_IT_init();
 #endif
+}
+
+/* Send a PhaseMap state frame (CAN_STATUS_PHASEMAP).
+ * data[0]=state, data[1]=probe_index (confirmed count used as proxy),
+ * data[2]=total_confirmed. */
+static void CAN_SendPhasemapStatus(void)
+{
+    CAN_Frame tx_frame;
+    tx_frame.id       = can_status_phasemap;
+    tx_frame.extended = false;
+    tx_frame.rtr      = false;
+    tx_frame.dlc      = 3;
+    tx_frame.data[0]  = (uint8_t)phasemap_state();
+    tx_frame.data[1]  = phasemap_confirmed_count(); /* probe_index */
+    tx_frame.data[2]  = phasemap_confirmed_count(); /* total_confirmed */
+    if (MCP2515_SendFrame(&tx_frame)) {
+        can_stats.tx_total++;
+    }
+}
+
+/* Send a PhaseMap probe-result frame (CAN_STATUS_PHASEMAP_PROBE).
+ * Sends the most recent confirmed probe result (index 0 for simplicity;
+ * the host can poll state frame to know when new data is available). */
+static void CAN_SendPhasemapProbe(uint8_t idx)
+{
+    pm_probe_t p = phasemap_probe_result(idx);
+    CAN_Frame tx_frame;
+    tx_frame.id       = can_status_phasemap_probe;
+    tx_frame.extended = false;
+    tx_frame.rtr      = false;
+    tx_frame.dlc      = 6;
+    tx_frame.data[0]  = p.pin.port;
+    tx_frame.data[1]  = p.pin.pin;
+    tx_frame.data[2]  = p.confirmed;
+    /* voltage_droop_mv LE (int16_t -> 3 bytes with sign extension for future) */
+    int16_t droop = p.voltage_droop_mv;
+    tx_frame.data[3]  = (uint8_t)((uint16_t)droop & 0xFF);
+    tx_frame.data[4]  = (uint8_t)(((uint16_t)droop >> 8) & 0xFF);
+    tx_frame.data[5]  = (droop < 0) ? 0xFF : 0x00; /* sign extension byte */
+    if (MCP2515_SendFrame(&tx_frame)) {
+        can_stats.tx_total++;
+    }
 }
 
 // Send a 1-byte board-command result reply (override_result_t value).
@@ -470,6 +535,45 @@ void CAN_ProcessMessages(void) {
                 CAN_SendBoardResult(ok ? (uint8_t)APPLIED_LIVE
                                        : (uint8_t)REJECTED_CONFLICT);
             }
+            /* ---- PhaseMap Wizard CAN commands ---- */
+            else if (rx_frame.id == can_cmd_phasemap_start) {
+                forceLog(" [PM START]");
+                if (rx_frame.dlc >= 1) {
+                    pm_mode_t mode = (rx_frame.data[0] == 1)
+                                     ? PM_MODE_AUTO_ADC
+                                     : PM_MODE_GUIDED;
+                    phasemap_start(mode);
+                    sprintf(msg, " mode=%u", (unsigned)rx_frame.data[0]);
+                    forceLog(msg);
+                    /* Reply with current state */
+                    CAN_SendPhasemapStatus();
+                }
+            }
+            else if (rx_frame.id == can_cmd_phasemap_confirm) {
+                /* Signal "CONFIRM DUMMY LOAD" — feeds the exact safety phrase
+                 * character-by-character into the wizard's ring buffer. */
+                forceLog(" [PM CONFIRM]");
+                static const char *phrase = "CONFIRM DUMMY LOAD\r";
+                for (uint8_t ci = 0; phrase[ci]; ci++) {
+                    phasemap_char(phrase[ci]);
+                }
+                CAN_SendPhasemapStatus();
+            }
+            else if (rx_frame.id == can_cmd_phasemap_char) {
+                forceLog(" [PM CHAR]");
+                if (rx_frame.dlc >= 1) {
+                    phasemap_char((char)rx_frame.data[0]);
+                    sprintf(msg, " ch=0x%02X", rx_frame.data[0]);
+                    forceLog(msg);
+                }
+                CAN_SendPhasemapStatus();
+            }
+            else if (rx_frame.id == can_cmd_phasemap_abort) {
+                forceLog(" [PM ABORT]");
+                phasemap_abort();
+                CAN_SendPhasemapStatus();
+            }
+            /* ---- End PhaseMap CAN commands ---- */
             else {
                 can_stats.rx_unknown++;
                 forceLog(" [UNKNOWN]");
@@ -702,7 +806,24 @@ void CAN_PrintConfiguration(void) {
     forceLog(msg);
     sprintf(msg, "  Boot:     0x%03X\r\n", (unsigned int)can_status_bootup);
     forceLog(msg);
-    
+
+    sprintf(msg, "\r\nPhaseMap Wizard Command IDs:\r\n");
+    forceLog(msg);
+    sprintf(msg, "  PM Start:   0x%03X\r\n", (unsigned int)can_cmd_phasemap_start);
+    forceLog(msg);
+    sprintf(msg, "  PM Confirm: 0x%03X\r\n", (unsigned int)can_cmd_phasemap_confirm);
+    forceLog(msg);
+    sprintf(msg, "  PM Char:    0x%03X\r\n", (unsigned int)can_cmd_phasemap_char);
+    forceLog(msg);
+    sprintf(msg, "  PM Abort:   0x%03X\r\n", (unsigned int)can_cmd_phasemap_abort);
+    forceLog(msg);
+    sprintf(msg, "PhaseMap Wizard Status IDs:\r\n");
+    forceLog(msg);
+    sprintf(msg, "  PM State:   0x%03X\r\n", (unsigned int)can_status_phasemap);
+    forceLog(msg);
+    sprintf(msg, "  PM Probe:   0x%03X\r\n", (unsigned int)can_status_phasemap_probe);
+    forceLog(msg);
+
     sprintf(msg, "========================\r\n\r\n");
     forceLog(msg);
 }

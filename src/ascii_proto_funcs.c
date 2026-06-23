@@ -21,6 +21,7 @@
 #include "defines.h"
 #include "config.h"
 #include "board_active.h"
+#include "phasemap.h"
 
 
 #ifdef CONTROL_SENSOR
@@ -648,6 +649,87 @@ int line_read_memory(PROTOCOL_STAT *s, char *cmd, char *ascii_out) {
 
 
 
+/* =========================================================================
+ * PhaseMap Wizard — ASCII serial interface
+ *
+ * Registered as command 'V' (mnemonic: Wizard).
+ * The ascii_cmd buffer in ASCIISTATE is 20 bytes; the longest subcommand
+ * we need is "Vstart guided" (13 chars including the leading 'V').
+ *
+ * Subcommands (all starting with 'V'):
+ *   Vstart g[uided]  — phasemap_start(PM_MODE_GUIDED)
+ *   Vstart a[uto]    — phasemap_start(PM_MODE_AUTO_ADC)
+ *   Vabort           — phasemap_abort()
+ *   Vstatus          — print state + probe index
+ *
+ * Single-char interactive input (y/n/s/q) during an active wizard session
+ * is handled by main.c routing individual received bytes to phasemap_char().
+ * This function handles the line-command dispatch only.
+ * ======================================================================= */
+int line_phasemap(PROTOCOL_STAT *s, char *cmd, char *ascii_out)
+{
+    /* cmd[0] == 'V' or 'v'; subcommand starts at cmd[1] */
+    const char *sub = cmd + 1;
+
+    /* Skip optional leading space */
+    while (*sub == ' ') sub++;
+
+    /* Dispatch on first letter of subcommand:
+     *   's' -> could be "start ..." or "status"
+     *   'a' -> "abort"
+     *   anything else -> help
+     */
+    if ((sub[0] == 's' || sub[0] == 'S') &&
+        (sub[1] == 't' || sub[1] == 'T') &&
+        (sub[2] == 'a' || sub[2] == 'A') &&
+        (sub[3] == 'r' || sub[3] == 'R')) {
+        /* "start ..." — skip "start" and optional space */
+        const char *arg = sub + 5;
+        while (*arg == ' ') arg++;
+        if (arg[0] == 'g' || arg[0] == 'G') {
+            phasemap_start(PM_MODE_GUIDED);
+            sprintf(ascii_out, "[PhaseMap] Wizard started (GUIDED mode).\r\n");
+        } else if (arg[0] == 'a' || arg[0] == 'A') {
+            phasemap_start(PM_MODE_AUTO_ADC);
+            sprintf(ascii_out, "[PhaseMap] Wizard started (AUTO_ADC mode).\r\n");
+        } else {
+            sprintf(ascii_out,
+                "[PhaseMap] Usage: Vstart g  (guided)\r\n"
+                "                  Vstart a  (auto ADC)\r\n");
+        }
+    } else if ((sub[0] == 's' || sub[0] == 'S') &&
+               (sub[1] == 't' || sub[1] == 'T') &&
+               (sub[2] == 'a' || sub[2] == 'A') &&
+               (sub[3] == 't' || sub[3] == 'T')) {
+        /* "status" */
+        static const char * const state_names[] = {
+            "IDLE", "SAFETY_GATE", "SCAN_ADC", "PROBE_LOWSIDE",
+            "PROBE_HALL", "BUILD_PROFILE", "DONE", "ABORTED"
+        };
+        pm_state_t st = phasemap_state();
+        int st_idx = (int)st;
+        if (st_idx < 0 || st_idx > 7) st_idx = 0;
+        sprintf(ascii_out,
+            "[PhaseMap] State: %s  confirmed_probes=%u\r\n",
+            state_names[st_idx],
+            (unsigned)phasemap_confirmed_count());
+    } else if (sub[0] == 'a' || sub[0] == 'A') {
+        /* "abort" */
+        phasemap_abort();
+        sprintf(ascii_out, "[PhaseMap] Aborted.\r\n");
+    } else {
+        /* Help */
+        sprintf(ascii_out,
+            "[PhaseMap] Wizard commands (prefix V):\r\n"
+            "  Vstart g  - start GUIDED mode (operator confirms y/n per pin)\r\n"
+            "  Vstart a  - start AUTO_ADC mode (uses battery droop)\r\n"
+            "  Vabort    - emergency stop, drives all gate pins LOW\r\n"
+            "  Vstatus   - show wizard state and confirmed-probe count\r\n"
+            "  During probe: type y/n to confirm/reject, s=skip, q=abort\r\n");
+    }
+    return 1;
+}
+
 /////////////////////////////////////////////
 // single byte commands at start of command
 // - i.e. only after CR of LF and ascii buffer empty
@@ -688,6 +770,12 @@ int main_ascii_init(PROTOCOL_STAT *s){
     ascii_add_line_fn( 'G', line_stm32, "display stm32 specific");
 
     ascii_add_line_fn( 'F', line_generic_var, get_F_description(s));
+
+    /* PhaseMap Wizard — 'V' for Wizard.
+     * Interactive chars (y/n/s/q) during an active session are routed via
+     * phasemap_char() in main.c's receive loop, not through this function. */
+    ascii_add_line_fn( 'V', line_phasemap,
+        "PhaseMap Wizard: Vstart g/a, Vabort, Vstatus");
 
     return 1;
 }
