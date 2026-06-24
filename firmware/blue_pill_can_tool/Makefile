@@ -25,7 +25,7 @@ LDFLAGS = $(MCU) -T linker.ld -nostdlib \
 TARGET  = blue_pill_can_tool
 
 # Source files (startup.s must come first to ensure vector table is at offset 0)
-SRCS_C  = main.c mcp2515.c usart.c slcan.c
+SRCS_C  = main.c bxcan.c mcp2515.c usart.c slcan.c
 SRCS_S  = startup.s
 
 OBJS_C  = $(SRCS_C:.c=.o)

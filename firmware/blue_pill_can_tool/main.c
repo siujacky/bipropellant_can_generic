@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include "device_regs.h"
 #include "mcp2515.h"
+#include "bxcan.h"  /* bxCAN on PB8/PB9 for 3-node test */
 #include "usart.h"
 #include "slcan.h"
 
@@ -176,7 +177,7 @@ static int execute_cmd(slcan_cmd_t cmd, slcan_frame_t *fr)
 
     case SLCAN_TX: {
         if (!g_can_open) { usart1_tx_byte('\x07'); return 1; }
-        int ret = mcp2515_tx(fr->id, fr->data, fr->dlc, fr->extended);
+        int ret = bxcan_app_tx(fr->id, fr->data, fr->dlc, fr->extended);
         if (ret == 0) {
             g_tx_count++;
             usart1_tx_byte(fr->extended ? 'Z' : 'z');
@@ -201,7 +202,7 @@ static int execute_cmd(slcan_cmd_t cmd, slcan_frame_t *fr)
     }
 
     case SLCAN_FLAGS: {
-        uint8_t eflg = mcp2515_read_errors();
+        uint8_t eflg = bxcan_app_read_errors();
         usart1_print("F");
         print_hex8(eflg);
         usart1_print("\r\n");
@@ -340,12 +341,11 @@ int main(void)
      * Immediate open prevents the Pico 2 SLCAN bridge from going BUS-OFF
      * during a listen-only window (no ACK node → too many TX errors → BUS-OFF).
      * The 'C' SLCAN command closes the bus if needed; 'O' reopens it. */
-    mcp2515_init(MCP_BRATE_250K);
+    /* bxCAN replaces MCP2515 for 3-node CAN test (PB8/PB9 + TJA1050) */
+    bxcan_app_init(250000);
     g_brate   = MCP_BRATE_250K;
     g_mode    = MODE_CAN;
-    if (mcp2515_enter_normal() == 0) {
-        g_can_open = 1;
-    }
+    g_can_open = 1;  /* bxCAN always open after init */
 
     /* 5. Banner */
     usart1_print("\r\nBlue Pill CAN Tool v1\r\n");
@@ -364,13 +364,13 @@ int main(void)
          * ---------------------------------------------------------------- */
         if (g_mode == MODE_CAN && g_can_open) {
             /* Poll: check INT pin (active-low) or CANINTF directly */
-            if (mcp2515_rx_available()) {
+            if (bxcan_app_rx_available()) {
                 uint32_t id  = 0;
                 uint8_t  dlc = 0;
                 uint8_t  data[8] = {0};
                 int      ext = 0;
 
-                if (mcp2515_rx(&id, data, &dlc, &ext)) {
+                if (bxcan_app_rx(&id, data, &dlc, &ext)) {
                     /* CAN bootloader trigger: 0x7FF [0xB0,0x01,0xB2] →
                      * write BKP magic and reset into bootloader (30s window). */
                     if (id == 0x7FFU && dlc >= 3 &&
@@ -388,7 +388,7 @@ int main(void)
                 }
 
                 /* Check for error/overrun and auto-clear CANINTF error bits */
-                (void)mcp2515_read_errors();
+                /* bxCAN handles errors internally */;
             }
         }
 

@@ -83,7 +83,7 @@ def slcan_open(port: str, baud: int = 115200) -> serial.Serial:
     # for old firmware. If the new firmware is installed, update this to S5.
     s.write(b'C\r')    # close (forces config mode)
     time.sleep(0.1)
-    s.write(b'S5\r')   # 250 kbps (standard SLCAN S5=250k; old firmware: S4=250k)
+    s.write(b'S4\r')   # 250 kbps on current Pico 2 firmware (old table: S4=250k)
     time.sleep(0.1)
     s.write(b'O\r')    # open at 250 kbps
     time.sleep(0.3)
