@@ -45,7 +45,7 @@ LOAD flash_bl.o
 LOAD main_bl.o
                 0x20001000                        _estack = (ORIGIN (RAM) + LENGTH (RAM))
 
-.text           0x08000000     0x1088
+.text           0x08000000     0x1300
  *(.isr_vector)
  .isr_vector    0x08000000       0x40 startup_bl.o
  *(.text)
@@ -112,74 +112,82 @@ LOAD main_bl.o
                 0x080006b0                flash_write_page_any
  .text.delay_ms
                 0x080006b8       0x20 main_bl.o
+ .text.bl_broadcast_status
+                0x080006d8       0xa8 main_bl.o
  .text.jump_to_app_at
-                0x080006d8       0x24 main_bl.o
+                0x08000780       0x24 main_bl.o
  .text.jump_to_slot
-                0x080006fc       0x1c main_bl.o
+                0x080007a4       0x1c main_bl.o
  .text.send_byte
-                0x08000718       0x2c main_bl.o
+                0x080007c0       0x2c main_bl.o
+ .text.ctrl_respond.constprop.0
+                0x080007ec       0x3c main_bl.o
  .text.bl_config_write.constprop.0
-                0x08000744       0x3c main_bl.o
+                0x08000828       0x3c main_bl.o
  .text.crc32_page.constprop.0
-                0x08000780       0x48 main_bl.o
+                0x08000864       0x48 main_bl.o
  .text.uart_do_upload
-                0x080007c8       0xbc main_bl.o
+                0x080008ac       0xbc main_bl.o
  .text.startup.main
-                0x08000884      0x4e4 main_bl.o
-                0x08000884                main
+                0x08000968      0x678 main_bl.o
+                0x08000968                main
  *(.rodata)
  *(.rodata.*)
- .rodata.hex.0  0x08000d68       0x11 usart_bl.o
- *fill*         0x08000d79        0x3 
+ .rodata.hex.0  0x08000fe0       0x11 usart_bl.o
+ *fill*         0x08000ff1        0x3 
  .rodata.main.str1.4
-                0x08000d7c      0x30b main_bl.o
-                0x08001088                        . = ALIGN (0x4)
- *fill*         0x08001087        0x1 
-                0x08001088                        _etext = .
+                0x08000ff4      0x30b main_bl.o
+                0x08001300                        . = ALIGN (0x4)
+ *fill*         0x080012ff        0x1 
+                0x08001300                        _etext = .
 
-.glue_7         0x08001088        0x0
- .glue_7        0x08001088        0x0 linker stubs
+.glue_7         0x08001300        0x0
+ .glue_7        0x08001300        0x0 linker stubs
 
-.glue_7t        0x08001088        0x0
- .glue_7t       0x08001088        0x0 linker stubs
+.glue_7t        0x08001300        0x0
+ .glue_7t       0x08001300        0x0 linker stubs
 
-.vfp11_veneer   0x08001088        0x0
- .vfp11_veneer  0x08001088        0x0 linker stubs
+.vfp11_veneer   0x08001300        0x0
+ .vfp11_veneer  0x08001300        0x0 linker stubs
 
-.v4_bx          0x08001088        0x0
- .v4_bx         0x08001088        0x0 linker stubs
+.v4_bx          0x08001300        0x0
+ .v4_bx         0x08001300        0x0 linker stubs
 
-.iplt           0x08001088        0x0
- .iplt          0x08001088        0x0 startup_bl.o
+.iplt           0x08001300        0x0
+ .iplt          0x08001300        0x0 startup_bl.o
 
-.rel.dyn        0x08001088        0x0
- .rel.iplt      0x08001088        0x0 startup_bl.o
+.rel.dyn        0x08001300        0x0
+ .rel.iplt      0x08001300        0x0 startup_bl.o
 
-.data           0x20000000        0x4 load address 0x08001088
+.data           0x20000000        0x8 load address 0x08001300
                 0x20000000                        _sdata = .
  *(.data)
  *(.data.*)
  .data.s_last_erased_page
                 0x20000000        0x4 flash_bl.o
-                0x20000004                        . = ALIGN (0x4)
-                0x20000004                        _edata = .
-                0x08001088                        _ldata = LOADADDR (.data)
+ .data.g_upload_target
+                0x20000004        0x4 main_bl.o
+                0x20000008                        . = ALIGN (0x4)
+                0x20000008                        _edata = .
+                0x08001300                        _ldata = LOADADDR (.data)
 
-.igot.plt       0x20000004        0x0 load address 0x0800108c
- .igot.plt      0x20000004        0x0 startup_bl.o
+.igot.plt       0x20000008        0x0 load address 0x08001308
+ .igot.plt      0x20000008        0x0 startup_bl.o
 
-.bss            0x20000004      0x424 load address 0x0800108c
-                0x20000004                        _sbss = .
+.bss            0x20000008      0x424 load address 0x08001308
+                0x20000008                        _sbss = .
  *(.bss)
  *(.bss.*)
- .bss.page_buf  0x20000004      0x400 main_bl.o
+ .bss.page_buf  0x20000008      0x400 main_bl.o
  .bss.g_transport
-                0x20000404        0x1 main_bl.o
- *fill*         0x20000405        0x3 
- .bss.g_config  0x20000408       0x20 main_bl.o
+                0x20000408        0x1 main_bl.o
+ .bss.g_upload_target_slot
+                0x20000409        0x1 main_bl.o
+ *fill*         0x2000040a        0x2 
+ .bss.g_config  0x2000040c       0x20 main_bl.o
  *(COMMON)
-                0x20000428                        . = ALIGN (0x4)
-                0x20000428                        _ebss = .
+                0x2000042c                        . = ALIGN (0x4)
+                0x2000042c                        _ebss = .
 
 /DISCARD/
  *(.ARM.exidx*)

@@ -30,6 +30,26 @@
 #define CAN_RX_ID    0x7DDU
 #define UART_TRIGGER 0xAAU
 
+/* Control channel IDs */
+#define BL_CTRL_RX_ID  0x7DCU
+#define BL_CTRL_TX_ID  0x7DBU
+
+/* Control command bytes */
+#define BL_CMD_BOOT          0x00U
+#define BL_CMD_UPLOAD_SLOT_A 0x01U
+#define BL_CMD_UPLOAD_SLOT_B 0x02U
+#define BL_CMD_UPLOAD_ADDR   0x03U
+#define BL_CMD_SET_BOOT_A    0x04U
+#define BL_CMD_SET_BOOT_B    0x05U
+#define BL_CMD_CLEAR_NVRAM   0x06U
+#define BL_CMD_STATUS        0x07U
+
+/* Control response status bytes */
+#define BL_STATUS_OK         0x00U
+#define BL_STATUS_AUTH_FAIL  0x01U
+#define BL_STATUS_INVALID    0x02U
+#define BL_STATUS_FLASH_ERR  0x03U
+
 /* ----------------------------------------------------------------------- */
 /* Simple delay: 8 MHz HSI, ~1ms per call at -O2                           */
 /* ----------------------------------------------------------------------- */
@@ -121,10 +141,181 @@ static void jump_to_app_at(uint32_t start)
 /* Global config — filled at startup */
 static bl_config_t g_config;
 
+/* Upload target — default Slot A, changeable via control channel */
+static uint32_t g_upload_target       = SLOT_A_START;
+static uint8_t  g_upload_target_slot  = 0;  /* 0=A, 1=B, 0xFF=custom */
+
 static void jump_to_slot(uint32_t slot)
 {
     uint32_t target = (slot == 1) ? SLOT_B_START : SLOT_A_START;
     jump_to_app_at(target);
+}
+
+/* ----------------------------------------------------------------------- */
+/* Control channel helpers                                                  */
+/* ----------------------------------------------------------------------- */
+
+/* BL version sent in STATUS frames */
+#define BL_VERSION_MAJOR  1U
+#define BL_VERSION_MINOR  0U
+
+/* Build and transmit a control response on BL_CTRL_TX_ID.
+ *   cmd    — echoed CMD byte
+ *   status — BL_STATUS_* code
+ *   info4  — 4-byte extra info (LE), e.g. uid0 for STATUS cmd
+ * buf[2] = g_config.boot_slot, buf[3] = g_upload_target_slot (always current).
+ */
+static void ctrl_respond(uint8_t cmd, uint8_t status, uint32_t info4)
+{
+    uint8_t buf[8];
+    buf[0] = cmd;
+    buf[1] = status;
+    buf[2] = (uint8_t)g_config.boot_slot;
+    buf[3] = g_upload_target_slot;
+    buf[4] = (uint8_t)(info4);
+    buf[5] = (uint8_t)(info4 >> 8);
+    buf[6] = (uint8_t)(info4 >> 16);
+    buf[7] = (uint8_t)(info4 >> 24);
+    mcp2515_tx(BL_CTRL_TX_ID, buf, 8);
+}
+
+/* Send 3 STATUS frames on BL_CTRL_TX_ID (0x7DB) carrying the full banner info.
+ * The host tool (can_flash.py --status) reads all 3 frames and prints:
+ *   biPropellant CAN Generic BL v<maj>.<min>
+ *   UID: <uid0>-<uid1>-<uid2>
+ *   Active slot: A/B (0x08002000 / 0x08020000)
+ *   Next boot:   A/B
+ *
+ * Frame 0  [0x07]: STATUS_OK | boot_slot | target_slot | uid0 LE
+ * Frame 1  [0x17]: uid1 LE (4B) | uid2 low 2B
+ * Frame 2  [0x27]: uid2 high 2B | ver_major | ver_minor | slot_a_id | slot_b_id
+ *   slot_a_id = 0xA1 (fixed marker for Slot A = 0x08002000)
+ *   slot_b_id = 0xB2 (fixed marker for Slot B = 0x08020000)
+ * Sub-frame tag is top nibble of byte[0]: 0x07 = frame-0, 0x17 = frame-1, 0x27 = frame-2.
+ */
+static void bl_broadcast_status(void)
+{
+    uint32_t uid0 = DESIG_UNIQUE_ID0;
+    uint32_t uid1 = DESIG_UNIQUE_ID1;
+    uint32_t uid2 = DESIG_UNIQUE_ID2;
+    uint8_t  slot = (uint8_t)g_config.boot_slot;
+    uint8_t buf[8];
+
+    /* Frame 0: cmd=0x07, status=OK, boot_slot, target_slot, uid0 LE */
+    buf[0] = BL_CMD_STATUS;            /* 0x07 = frame-0 tag */
+    buf[1] = BL_STATUS_OK;
+    buf[2] = slot;
+    buf[3] = g_upload_target_slot;
+    buf[4] = (uint8_t)(uid0);
+    buf[5] = (uint8_t)(uid0 >> 8);
+    buf[6] = (uint8_t)(uid0 >> 16);
+    buf[7] = (uint8_t)(uid0 >> 24);
+    mcp2515_tx(BL_CTRL_TX_ID, buf, 8);
+
+    /* Frame 1: uid1 LE + uid2 low 2 bytes */
+    buf[0] = 0x17U;                    /* 0x17 = frame-1 tag */
+    buf[1] = BL_STATUS_OK;
+    buf[2] = (uint8_t)(uid1);
+    buf[3] = (uint8_t)(uid1 >> 8);
+    buf[4] = (uint8_t)(uid1 >> 16);
+    buf[5] = (uint8_t)(uid1 >> 24);
+    buf[6] = (uint8_t)(uid2);
+    buf[7] = (uint8_t)(uid2 >> 8);
+    mcp2515_tx(BL_CTRL_TX_ID, buf, 8);
+
+    /* Frame 2: uid2 high 2 bytes + version + slot markers */
+    buf[0] = 0x27U;                    /* 0x27 = frame-2 tag */
+    buf[1] = BL_STATUS_OK;
+    buf[2] = (uint8_t)(uid2 >> 16);
+    buf[3] = (uint8_t)(uid2 >> 24);
+    buf[4] = BL_VERSION_MAJOR;
+    buf[5] = BL_VERSION_MINOR;
+    buf[6] = 0xA1U;                    /* Slot A marker (host: 0x08002000) */
+    buf[7] = 0xB2U;                    /* Slot B marker (host: 0x08020000) */
+    mcp2515_tx(BL_CTRL_TX_ID, buf, 8);
+}
+
+/* Handle an incoming control frame from 0x7DC.
+ * Frame layout: [0]=CMD [1..3]=uid0 low 3 bytes (auth) [4..7]=args
+ */
+static void handle_ctrl_cmd(const uint8_t *data, uint8_t len)
+{
+    (void)len;
+
+    /* Auth check: first 3 bytes of DESIG_UNIQUE_ID0 */
+    uint32_t uid0 = DESIG_UNIQUE_ID0;
+    if (data[1] != (uint8_t)(uid0)      ||
+        data[2] != (uint8_t)(uid0 >> 8) ||
+        data[3] != (uint8_t)(uid0 >> 16)) {
+        ctrl_respond(data[0], BL_STATUS_AUTH_FAIL, 0);
+        return;
+    }
+
+    switch (data[0]) {
+    case BL_CMD_BOOT:
+        ctrl_respond(BL_CMD_BOOT, BL_STATUS_OK, 0);
+        delay_ms(50);
+        jump_to_slot(g_config.boot_slot);
+        break;
+
+    case BL_CMD_UPLOAD_SLOT_A:
+        g_upload_target      = SLOT_A_START;
+        g_upload_target_slot = 0;
+        ctrl_respond(BL_CMD_UPLOAD_SLOT_A, BL_STATUS_OK, 0);
+        break;
+
+    case BL_CMD_UPLOAD_SLOT_B:
+        g_upload_target      = SLOT_B_START;
+        g_upload_target_slot = 1;
+        ctrl_respond(BL_CMD_UPLOAD_SLOT_B, BL_STATUS_OK, 0);
+        break;
+
+    case BL_CMD_UPLOAD_ADDR: {
+        uint32_t addr = (uint32_t)data[4]
+                      | ((uint32_t)data[5] << 8)
+                      | ((uint32_t)data[6] << 16)
+                      | ((uint32_t)data[7] << 24);
+        g_upload_target      = addr;
+        g_upload_target_slot = 0xFFU;
+        ctrl_respond(BL_CMD_UPLOAD_ADDR, BL_STATUS_OK, 0);
+        break;
+    }
+
+    case BL_CMD_SET_BOOT_A:
+        g_config.boot_slot = 0;
+        bl_config_write(&g_config);
+        ctrl_respond(BL_CMD_SET_BOOT_A, BL_STATUS_OK, 0);
+        delay_ms(50);
+        jump_to_slot(0);
+        break;
+
+    case BL_CMD_SET_BOOT_B:
+        g_config.boot_slot = 1;
+        bl_config_write(&g_config);
+        ctrl_respond(BL_CMD_SET_BOOT_B, BL_STATUS_OK, 0);
+        delay_ms(50);
+        jump_to_slot(1);
+        break;
+
+    case BL_CMD_CLEAR_NVRAM:
+        flash_unlock();
+        flash_erase_region(APP_NVRAM_ADDR, APP_NVRAM_ADDR + 4096U);
+        flash_lock();
+        ctrl_respond(BL_CMD_CLEAR_NVRAM, BL_STATUS_OK, 0);
+        delay_ms(200);
+        jump_to_slot(g_config.boot_slot);
+        break;
+
+    case BL_CMD_STATUS:
+        /* Send all 3 banner frames (frame-0 carries cmd echo 0x07 + STATUS_OK
+         * so the host knows a query was answered, not just an auto-broadcast). */
+        bl_broadcast_status();
+        break;
+
+    default:
+        ctrl_respond(data[0], BL_STATUS_INVALID, 0);
+        break;
+    }
 }
 
 /* ----------------------------------------------------------------------- */
@@ -237,10 +428,12 @@ page_retry:;
 }
 
 /* ----------------------------------------------------------------------- */
-/* can_upload — CAN page upload to base_addr                               */
+/* can_upload — CAN page upload; uses g_upload_target (set by ctrl cmds)   */
 /* ----------------------------------------------------------------------- */
 static void can_upload(uint32_t base_addr)
 {
+    (void)base_addr;   /* ignored — g_upload_target set via ctrl channel */
+
     send_byte('S');
 
     uint8_t pc_buf[4];
@@ -252,7 +445,7 @@ static void can_upload(uint32_t base_addr)
     if (n_pages == 0 || n_pages > 246) jump_to_slot(g_config.boot_slot);
 
     flash_unlock();
-    uint32_t flash_addr = base_addr;
+    uint32_t flash_addr = g_upload_target;
 
     for (uint32_t p = 0; p < n_pages; p++) {
         uint8_t retry = 0;
@@ -298,6 +491,9 @@ can_page_retry:;
     }
 
     flash_lock();
+    /* Restore default upload target for any subsequent commands */
+    g_upload_target      = SLOT_A_START;
+    g_upload_target_slot = 0;
     send_byte('D');
     delay_ms(100);
     jump_to_slot(g_config.boot_slot);
@@ -477,6 +673,9 @@ int main(void)
         advert[6] = 0x00; advert[7] = 0x00;
         mcp2515_tx(CAN_TX_ID, advert, 8);
     }
+    /* Auto-broadcast STATUS frames so any listening host sees the banner
+     * without needing to send a STATUS query first. */
+    bl_broadcast_status();
 
     /* 5. Poll both transports for 500 ms; first response wins */
     g_transport = TRANSPORT_NONE;
@@ -498,7 +697,7 @@ int main(void)
             break;
         }
 
-        /* Check CAN: matching 0x7DD frame with DESIG_UNIQUE_ID2 */
+        /* Check CAN: matching 0x7DD upload trigger or 0x7DC control command */
         uint16_t can_id;
         if (mcp2515_rx(&can_id, rx_buf, &rx_len)) {
             if (can_id == CAN_RX_ID && rx_len >= 4) {
@@ -510,6 +709,9 @@ int main(void)
                     g_transport = TRANSPORT_CAN;
                     break;
                 }
+            } else if (can_id == BL_CTRL_RX_ID && rx_len >= 5) {
+                /* Control command — handle in-place; loop continues polling */
+                handle_ctrl_cmd(rx_buf, rx_len);
             }
         }
 
