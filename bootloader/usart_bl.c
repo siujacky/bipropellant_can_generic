@@ -99,3 +99,33 @@ int usart_rx_buf(uint8_t *buf, uint32_t len, uint32_t timeout_ms)
     }
     return 1;
 }
+
+void usart_print(const char *s)
+{
+    while (*s)
+        usart_tx_byte((uint8_t)*s++);
+}
+
+void usart_print_hex32(uint32_t v)
+{
+    static const char hex[] = "0123456789ABCDEF";
+    for (int i = 28; i >= 0; i -= 4)
+        usart_tx_byte((uint8_t)hex[(v >> i) & 0xFU]);
+}
+
+void usart_print_uint32(uint32_t v)
+{
+    char buf[10];
+    int  pos = 0;
+    if (v == 0) {
+        usart_tx_byte('0');
+        return;
+    }
+    while (v > 0) {
+        buf[pos++] = (char)('0' + (v % 10));
+        v /= 10;
+    }
+    /* buf holds digits in reverse order */
+    for (int i = pos - 1; i >= 0; i--)
+        usart_tx_byte((uint8_t)buf[i]);
+}

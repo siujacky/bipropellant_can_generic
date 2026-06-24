@@ -34,4 +34,13 @@ void usart_tx(const uint8_t *buf, uint8_t len);
 /* Receive exactly len bytes; returns 0 on timeout (timeout_ms each byte). */
 int usart_rx_buf(uint8_t *buf, uint32_t len, uint32_t timeout_ms);
 
+/* Send a null-terminated string. */
+void usart_print(const char *s);
+
+/* Send 8 uppercase hex characters representing a 32-bit value (e.g. "08002000"). */
+void usart_print_hex32(uint32_t v);
+
+/* Send decimal representation of a 32-bit value as ASCII (no malloc). */
+void usart_print_uint32(uint32_t v);
+
 #endif /* USART_BL_H */

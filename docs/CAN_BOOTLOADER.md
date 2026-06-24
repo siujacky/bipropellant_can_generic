@@ -20,16 +20,20 @@ whichever master connects first wins. If neither connects, the application boots
 
 ---
 
-## Flash Memory Layout
+## Flash Memory Layout (A/B Dual-Slot)
 
-| Address range              | Size   | Contents                              |
-|----------------------------|--------|---------------------------------------|
-| 0x08000000 – 0x08001FFF   | 8 KB   | CAN bootloader (bootloader.bin)       |
-| 0x08002000 – 0x0803F7FF   | ~248 KB| Application firmware (hover.bin)      |
-| 0x0803F800 – 0x0803FFFF   | 2 KB   | Reserved flash (myFlashSection / NV)  |
+| Address range              | Size   | Contents                                        |
+|----------------------------|--------|-------------------------------------------------|
+| 0x08000000 – 0x08001FFF   | 8 KB   | Bootloader (bootloader.bin) — never overwritten |
+| **0x08002000 – 0x0801FFFF** | **120 KB** | **Slot A — Primary** (compiled at 0x08002000) |
+| **0x08020000 – 0x0803DFFF** | **120 KB** | **Slot B — Secondary** (compiled at 0x08020000) |
+| 0x0803E000 – 0x0803FFFF   | 8 KB   | Bootloader config (A/B flag) + App NVRAM        |
 
-The linker script `STM32F103RCTx_FLASH.ld` sets `FLASH ORIGIN = 0x08002000`,
-so every `make` build produces a binary linked at that offset.
+- `STM32F103RCTx_FLASH.ld` → Slot A binary (ORIGIN=0x08002000, LENGTH=120K)
+- `STM32F103RCTx_FLASH_SLOTB.ld` → Slot B binary (ORIGIN=0x08020000, LENGTH=120K)
+
+App NVRAM (FlashContent / saved settings) lives at 0x0803F000–0x0803FFFF (4 KB).
+Bootloader A/B config lives at 0x0803E000–0x0803EFFF (2 KB).
 
 ---
 
@@ -171,3 +175,103 @@ the bootloader jumps to the application.
 
 Without this step, all interrupts (SysTick, CAN, UART, …) would vector into
 the bootloader's (now-invalid) handler table.
+
+---
+
+## UART Interactive Menu
+
+Open a serial terminal (115200 baud, 8N1) on **PA9 (TX) / PA10 (RX)** of the board. Power it on (or reset it). Press **any key** within 500 ms to enter the menu. (Sending `0xAA` byte instead goes directly to silent auto-upload mode — compatible with `uart-updater.py`.)
+
+```
+===================================
+  biPropellant CAN Generic BL v1
+  UID: AABBCCDD...
+  Active slot: A (0x08002000)
+  Next boot:   A
+===================================
+ [1] Flash -> Slot A  (primary,   0x08002000)
+ [2] Flash -> Slot B  (secondary, 0x08020000)
+ [3] Flash -> custom address
+ [4] Set next boot: Slot A
+ [5] Set next boot: Slot B
+ [6] Clear NVRAM (settings at 0x0803F000)
+ [0] Boot application
+===================================
+Choice [0-6]:
+```
+
+### Menu options
+
+| Option | Action |
+|---|---|
+| **[1]** | Flash Slot A — waits for `0xAA` then uploads; Slot A always compiled at 0x08002000 |
+| **[2]** | Flash Slot B — waits for `0xAA` then uploads; use Slot B binary (see below) |
+| **[3]** | Flash custom address — you type 8 hex digits; writing into bootloader region requires typing `YES` to confirm |
+| **[4]** | Mark Slot A as next boot — saves to bootloader config flash, boots Slot A |
+| **[5]** | Mark Slot B as next boot — saves to bootloader config flash, boots Slot B next power-on |
+| **[6]** | Clear NVRAM — erases saved PID/CAN settings (0x0803F000, 4 KB); app resets to defaults |
+| **[0]** | Boot immediately from whichever slot is configured |
+
+After flashing Slot B via option [2], the menu asks:
+```
+Set Slot B as next boot? (y/n):
+```
+Pressing `y` saves the boot flag and Slot B will be used on next power-on.
+
+---
+
+## Building a Slot B Image
+
+Slot A and Slot B images must be compiled at **different addresses** because the STM32 firmware has hard-coded vector tables and absolute addresses:
+
+```bash
+# Slot A (default, primary):
+make clean && make
+# → build/hover.bin  (linked at 0x08002000)
+
+# Slot B (secondary):
+make clean && make LDSCRIPT=STM32F103RCTx_FLASH_SLOTB.ld
+# → build/hover.bin  (linked at 0x08020000)
+```
+
+> **Why two builds?** The Cortex-M3 vector table and `SCB->VTOR` are set to the compile-time origin. A Slot A binary flashed to Slot B will jump to the wrong address and crash immediately.
+
+---
+
+## A/B Update Workflow (Safe OTA)
+
+This lets you test new firmware without risking your current working image:
+
+```
+1. Build Slot B image:
+   make LDSCRIPT=STM32F103RCTx_FLASH_SLOTB.ld
+
+2. Flash to Slot B via UART menu option [2]:
+   (terminal at 115200 baud → press any key → [2] → 0xAA →
+    uart-updater.py sends build/hover.bin → confirm "set as next boot? y")
+
+3. Reboot. Board boots Slot B.
+   → If it works: run [5] from the menu to make Slot B permanent, or leave as-is.
+   → If it fails/crashes: power-cycle without any UART input → bootloader
+     runs [4] automatically after timeout → falls back to Slot A.
+
+4. (Optional) After confirming Slot B works, promote it to Slot A:
+   Flash Slot B content → Slot A with option [1].
+```
+
+---
+
+## NVRAM Clear
+
+Option [6] erases the application settings sector (FlashContent / PID gains / CAN IDs) at 0x0803F000. The bootloader's own A/B config at 0x0803E000 is **not** erased by this command — to reset the boot slot, use option [4] (set to Slot A).
+
+---
+
+## Recovery
+
+If the application flash is corrupt (both slots bad), the bootloader still runs and offers the menu. Flash a known-good image via UART option [1] or CAN.
+
+If the **bootloader itself** is corrupt, use ST-Link:
+```bash
+st-flash write bootloader/bootloader.bin 0x08000000
+```
