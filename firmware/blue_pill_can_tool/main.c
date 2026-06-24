@@ -397,17 +397,39 @@ int main(void)
                         BKP_DR1      = 0xB001U;
                         NVIC_SystemReset();
                     }
+                    /* CAN bootloader CLEAR trigger: 0x7FF [0xB0,0x00,0xB2]
+                     * Clears BKP_DR1 so the next reset uses the 500ms window,
+                     * not the 30s extended window.  Send this before any reset
+                     * that is NOT intended to start a firmware upload session. */
+                    if (id == 0x7FFU && dlc >= 3 &&
+                        data[0] == 0xB0U && data[1] == 0x00U && data[2] == 0xB2U) {
+                        RCC_APB1ENR |= RCC_APB1ENR_PWREN | RCC_APB1ENR_BKPEN;
+                        PWR_CR      |= PWR_CR_DBP;
+                        BKP_DR1      = 0x0000U;   /* clear — BL will use 500ms window */
+                        NVIC_SystemReset();
+                    }
                     /* MCP2515 TX trigger: ID=0x600 → lazy-init MCP2515, then TX 0x601.
                      * Lazy init avoids interference with bxCAN during startup. */
                     if (id == 0x600U) {
+                        uint8_t mcp_canstat = 0xFF;  /* 0xFF = SPI not responding */
                         if (!g_mcp_initialized) {
                             mcp2515_init(MCP_BRATE_250K);
-                            mcp2515_enter_normal();
+                            int init_ok = mcp2515_enter_normal();
+                            mcp_canstat = mcp2515_read_canstat();
                             g_mcp_initialized = 1;
+                            /* Send SPI diagnostic on 0x602: [data[0], init_ok, CANSTAT] */
+                            uint8_t diag[3]={(uint8_t)data[0],(uint8_t)(init_ok==0?1:0),mcp_canstat};
+                            bxcan_app_tx(0x602U, diag, 3, 0);
+                        } else {
+                            mcp_canstat = mcp2515_read_canstat();
                         }
-                        uint8_t mcp_tx[3] = {data[0], 0xC1, (uint8_t)(g_rx_count & 0xFF)};
-                        mcp2515_tx(0x601U, mcp_tx, 3, 0);
+                        uint8_t mcp_tx[4] = {data[0], 0xC1, mcp_canstat, (uint8_t)(g_rx_count & 0xFF)};
+                        mcp2515_tx(0x601U, mcp_tx, 4, 0);
                     }
+                    /* Echo received frame on id+1 so Pico2 can see bxCAN received it.
+                     * This proves bxCAN RX without requiring SWD g_rx_count reads. */
+                    bxcan_app_tx(id + 1U, data, dlc, ext);
+
                     char line[32];
                     slcan_format_rx(id, ext, dlc, data, line);
                     usart1_print(line);
