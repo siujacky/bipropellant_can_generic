@@ -73,17 +73,20 @@ def _crc32(data: bytes) -> int:
 def slcan_open(port: str, baud: int = 115200) -> serial.Serial:
     s = serial.Serial(port, baud, timeout=1)
     time.sleep(0.3)
-    # Close any stale session, then reopen at the Pico 2's default 250 kbps.
-    # We do NOT send 'S5\r' here: the Pico 2 SLCAN firmware auto-initialises
-    # at 250 kbps on startup (mcp_init(250000u)).  Earlier firmware versions
-    # had a missing S3=100k entry in the bitrate table, so 'S5' mapped to
-    # 500 kbps instead of 250 kbps — causing a silent bitrate mismatch with
-    # the Blue Pill.  The safe approach is to let the Pico 2 keep its 250 kbps
-    # setting from startup and simply reopen the bus.
-    s.write(b'C\r')    # close (forces clean state)
+    # Close any stale session, explicitly set 250 kbps, then open.
+    # We always set the bitrate explicitly because a prior debug session may
+    # have left the Pico 2 at a different rate (e.g., S6=500k).
+    # Firmware-version-safe approach:
+    #   Old Pico 2 firmware (pre-fix): S4 = 250 kbps, S5 = 500 kbps (bug)
+    #   New Pico 2 firmware (post-fix): S4 = 125 kbps, S5 = 250 kbps
+    # To handle both, close first, then re-init at the correct rate via S4
+    # for old firmware. If the new firmware is installed, update this to S5.
+    s.write(b'C\r')    # close (forces config mode)
     time.sleep(0.1)
-    s.write(b'O\r')    # open at existing 250 kbps
-    time.sleep(0.2)
+    s.write(b'S4\r')   # 250 kbps on OLD Pico 2 firmware (bitrates[4]=250000)
+    time.sleep(0.1)
+    s.write(b'O\r')    # open at 250 kbps
+    time.sleep(0.3)
     return s
 
 def slcan_send(s: serial.Serial, can_id: int, data: bytes) -> None:

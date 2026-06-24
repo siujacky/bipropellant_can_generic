@@ -95,84 +95,6 @@ void mcp2515_init(void) {
     }
     g_bl_canstat = mcp_read_reg(MCP_CANSTAT);
     g_bl_canctrl = canctrl_rb;
-
-    /* Abort all stale TX: SPI RESET (0xC0 MSB=1) may fail at 5V leaving old
-     * TXREQ bits set. Write CANCTRL=0x10 (NORMAL+ABAT, only bit4=HIGH works
-     * at 5V). After abort, chip returns to NORMAL with all TXREQ bits cleared. */
-    mcp_write_reg(MCP_CANCTRL, 0x10U);  /* NORMAL + ABAT */
-    delay_ms(5);                         /* wait for all TX to abort */
-    mcp_write_reg(MCP_CANCTRL, 0x00U);  /* NORMAL, clear ABAT */
-    delay_ms(2);
-    /* Re-apply OSM after ABAT cleared it */
-    mcp_write_reg(MCP_CANCTRL, 0x08U);
-    delay_ms(1);
-    canctrl_rb = mcp_read_reg(MCP_CANCTRL);
-    g_bl_canctrl = canctrl_rb;   /* update with post-ABAT value */
-
-    /* ---------------------------------------------------------------
-     * Internal LOOPBACK self-test (no CANH/CANL wires needed).
-     * Put MCP2515 into LOOPBACK mode, transmit one frame, verify it
-     * is received internally.  Result in g_bl_loopback:
-     *   0xAA = test not run (init fail)
-     *   0x01 = LOOPBACK TX+RX OK   → SPI and MCP2515 logic work ✓
-     *   0x00 = LOOPBACK TX failed  → SPI write of TXREQ is broken ✗
-     * After the test the chip is restored to NORMAL mode.
-     * --------------------------------------------------------------- */
-    g_bl_loopback = 0xAAU;
-    mcp_write_reg(MCP_CANCTRL, 0x40U);   /* LOOPBACK mode */
-    delay_ms(2);
-    if ((mcp_read_reg(MCP_CANSTAT) & 0xE0U) == 0x40U) {
-        /* Abort all pending TX: SPI RESET (0xC0, MSB=1) may fail at 5V leaving
-         * stale TXREQ in TXB0/TXB1/TXB2 from a previous session.  Any stale TX
-         * would block our TXB1 test frame.  Set CANCTRL.ABAT (bit4=0x10) in
-         * LOOPBACK mode: 0x40|0x10=0x50 (bits 4,6 HIGH — both work at 5V). */
-        mcp_write_reg(MCP_CANCTRL, 0x50U);   /* LOOPBACK + ABAT */
-        delay_ms(2);                           /* wait for abort to complete */
-        mcp_write_reg(MCP_CANCTRL, 0x40U);   /* LOOPBACK, clear ABAT */
-        delay_ms(1);
-
-        /* Clear any stale RX flags */
-        CS_LOW(); spi_xfer(MCP_BIT_MODIFY); spi_xfer(MCP_CANINTF);
-        spi_xfer(0x03U); spi_xfer(0x00U); CS_HIGH();
-        delay_ms(1);
-
-        /* Clear stale TXREQ in TXB1 by writing 0x00 (all LOW bits — always works
-         * at 5V since no HIGH bits needed). ABAT via CANCTRL.bit4 did not clear TXB1 at 5V (root cause unclear; direct write of 0x00 attempted instead).
-         * Writing 0x00 to addr 0x40 (bit6 only) clears TXREQ and priority. */
-        mcp_write_reg(MCP_TXB1CTRL, 0x00U);
-        delay_ms(2);
-        g_bl_txb0ctrl = mcp_read_reg(MCP_TXB1CTRL);  /* should be 0x00 now */
-
-        /* Load test frame into TXB1 */
-        mcp_write_reg(MCP_TXB1SIDH, 0x55U);
-        mcp_write_reg(MCP_TXB1SIDL, 0x00U);
-        mcp_write_reg(MCP_TXB1EID8, 0x00U);
-        mcp_write_reg(MCP_TXB1EID0, 0x00U);
-        mcp_write_reg(MCP_TXB1DLC,  0x01U);
-        mcp_write_reg(MCP_TXB1D0,   0xA5U);
-        /* Trigger TX: addr 0x40 (bit6 only ✓), data 0x04 (bit2 = TXREQ ✓) */
-        mcp_write_reg(MCP_TXB1CTRL, MCP_TXCTRL_TXREQ);
-        /* Wait for internal RX — check BOTH RXB0 and RXB1 (rollover may apply) */
-        uint32_t poll = 10000;
-        while (poll-- && !(mcp_read_reg(MCP_CANINTF) & 0x03U));
-        g_bl_loopback = (mcp_read_reg(MCP_CANINTF) & 0x03U) ? 1U : 0U;
-        /* Clear all RX flags */
-        CS_LOW(); spi_xfer(MCP_BIT_MODIFY); spi_xfer(MCP_CANINTF);
-        spi_xfer(0x03U); spi_xfer(0x00U); CS_HIGH();
-    }
-    /* Restore NORMAL + OSM (same retry loop as init — OSM bit 3 may need retries) */
-    mcp_write_reg(MCP_CANCTRL, MCP_MODE_NORMAL);
-    delay_ms(2);
-    {
-        uint8_t rb;
-        for (int try = 0; try < 5; try++) {
-            mcp_write_reg(MCP_CANCTRL, 0x08U);
-            delay_ms(1);
-            rb = mcp_read_reg(MCP_CANCTRL);
-            if ((rb & 0x08U) == 0x08U) break;
-        }
-        g_bl_canctrl = mcp_read_reg(MCP_CANCTRL);  /* update post-restore canctrl */
-    }
 }
 
 volatile uint8_t g_bl_canstat;
@@ -193,23 +115,20 @@ static uint8_t g_bl_tx_done;
 
 void mcp2515_tx(uint16_t id, const uint8_t *data, uint8_t len) {
     if (len > 8) len = 8;
-    /* Use TXB1 (addresses 0x40-0x46, bit6 only) not TXB0 (0x30-0x36, bit4+5).
-     * At 5V VCC bit4 of address bytes fails → writes to TXB0 (0x3x) land in
-     * TEC/REC (0x2x, read-only): frame never loaded, TXREQ never triggered.
-     * TXB1 addresses use only bit6 HIGH (confirmed working at 5V). */
+    /* Use TXB0 at 3.3V VCC (TXB1 was only needed as 5V workaround). */
     uint32_t timeout = 10000;
-    while ((mcp_read_reg(MCP_TXB1CTRL) & MCP_TXCTRL_TXREQ) && --timeout);
+    while ((mcp_read_reg(MCP_TXB0CTRL) & MCP_TXCTRL_TXREQ) && --timeout);
     if (!timeout) return;
-    mcp_write_reg(MCP_TXB1SIDH, (uint8_t)(id >> 3));
-    mcp_write_reg(MCP_TXB1SIDL, (uint8_t)((id & 0x7U) << 5));
-    mcp_write_reg(MCP_TXB1EID8, 0x00);
-    mcp_write_reg(MCP_TXB1EID0, 0x00);
-    mcp_write_reg(MCP_TXB1DLC,  len & 0x0F);
-    for (uint8_t i = 0; i < len; i++) mcp_write_reg(MCP_TXB1D0 + i, data[i]);
-    mcp_write_reg(MCP_TXB1CTRL, MCP_TXCTRL_TXREQ);  /* 0x40 = bit6 only ✓ */
+    mcp_write_reg(MCP_TXB0SIDH, (uint8_t)(id >> 3));
+    mcp_write_reg(MCP_TXB0SIDL, (uint8_t)((id & 0x7U) << 5));
+    mcp_write_reg(MCP_TXB0EID8, 0x00);
+    mcp_write_reg(MCP_TXB0EID0, 0x00);
+    mcp_write_reg(MCP_TXB0DLC,  len & 0x0F);
+    for (uint8_t i = 0; i < len; i++) mcp_write_reg(MCP_TXB0D0 + i, data[i]);
+    mcp_write_reg(MCP_TXB0CTRL, MCP_TXCTRL_TXREQ);
     timeout = 50000;
-    while ((mcp_read_reg(MCP_TXB1CTRL) & MCP_TXCTRL_TXREQ) && --timeout);
-    if (!g_bl_tx_done) { g_bl_txb0ctrl = mcp_read_reg(MCP_TXB1CTRL); g_bl_tx_done = 1; }
+    while ((mcp_read_reg(MCP_TXB0CTRL) & MCP_TXCTRL_TXREQ) && --timeout);
+    if (!g_bl_tx_done) { g_bl_txb0ctrl = mcp_read_reg(MCP_TXB0CTRL); g_bl_tx_done = 1; }
 }
 
 int mcp2515_rx(uint16_t *id_out, uint8_t *data_out, uint8_t *len_out) {
