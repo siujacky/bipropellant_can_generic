@@ -30,6 +30,8 @@ static const dev_entry_t k_devices[] = {
     { 0x0411, 20, "STM32F2xx",         "F2"     },
     { 0x0413, 192,"STM32F405/F407",    "F4"     },
     { 0x0419, 256,"STM32F42x/F43x",   "F4"     },
+    { 0x0431, 128,"STM32F411xC/xE (Black Pill)", "F4" },  /* 512KB max */
+    { 0x0441, 128,"STM32F412",         "F4"     },
     { 0x0449, 256,"STM32F7xx",         "F7"     },
     /* GD32 (some share IDs with STM32 for drop-in compatibility) */
     { 0xA641, 20, "GD32F103 (med)",    "medium" },

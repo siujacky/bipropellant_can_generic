@@ -43,6 +43,7 @@
 #define BL_CMD_SET_BOOT_B    0x05U
 #define BL_CMD_CLEAR_NVRAM   0x06U
 #define BL_CMD_STATUS        0x07U
+#define BL_CMD_ENTER_DFU     0x08U   /* Jump to ROM DFU (VID_0483:PID_DF11) */
 
 /* Control response status bytes */
 #define BL_STATUS_OK         0x00U
@@ -118,6 +119,69 @@ static void bl_config_write(const bl_config_t *cfg)
         addr += 2;
     }
     flash_lock();
+}
+
+/* ----------------------------------------------------------------------- */
+/* Jump to STM32 ROM bootloader (system memory) — enables USB DFU on Win  */
+/*                                                                          */
+/* When Windows shows "DEVICE_DESCRIPTOR_FAILURE" / VID_0000:PID_0002 the  */
+/* STM32 is not responding to USB enumeration.  The internal ROM bootloader  */
+/* at 0x1FFFF000 (F103) / 0x1FFF0000 (F4) handles USB and appears as       */
+/* VID_0483:PID_DF11 which STM32CubeProgrammer or dfu-util recognises.     */
+/*                                                                          */
+/* Triggered by: BKP_DR2 = BKP_MAGIC_ENTER_DFU (0xDFD0) set by the        */
+/* application BEFORE calling NVIC_SystemReset(), OR by menu option [7].   */
+/*                                                                          */
+/* Sequence (per AN2606 "jump from application" recommendation):            */
+/*   1. Disable SysTick so no tick fires into wrong vector table.           */
+/*   2. Disable + clear all NVIC IRQs.                                      */
+/*   3. Reset APB clocks (USB transceiver needs a clean state).             */
+/*   4. Load SP from ROM address[0]; verify it points into SRAM.            */
+/*   5. Load PC from ROM address[1]; jump.                                  */
+/* The ROM bootloader then initialises USB and enumerates on Windows as     */
+/* VID_0483:PID_DF11 without any additional driver if STM32CubeProgrammer  */
+/* is installed, or after Zadig assigns WinUSB for dfu-util.               */
+/* ----------------------------------------------------------------------- */
+static void enter_rom_dfu(void)
+{
+    /* Step 1: Disable SysTick */
+    SYST_CSR = 0; SYST_RVR = 0; SYST_CVR = 0;
+
+    /* Step 2: Disable all IRQs */
+    __asm volatile("cpsid i");
+    NVIC_ICER0 = 0xFFFFFFFFUL;
+    NVIC_ICER1 = 0xFFFFFFFFUL;
+    NVIC_ICER2 = 0xFFFFFFFFUL;
+    /* Clear pending */
+    *(volatile uint32_t *)0xE000E280UL = 0xFFFFFFFFUL;
+    *(volatile uint32_t *)0xE000E284UL = 0xFFFFFFFFUL;
+    *(volatile uint32_t *)0xE000E288UL = 0xFFFFFFFFUL;
+
+    /* Step 3: Reset APB1+APB2 peripheral clocks so USB sees a clean state */
+    RCC_APB1ENR = 0;
+    RCC_APB2ENR = 0;
+
+    /* Step 4+5: Read SP and PC from the ROM bootloader vector table.
+     * Select address by DevID: F4 uses 0x1FFF0000, F103 uses 0x1FFFF000. */
+    uint16_t dev_id = (uint16_t)(DBGMCU_IDCODE & 0x0FFFU);
+    uint32_t rom_base = ROM_BL_ADDR_F1;  /* default: STM32F103 */
+    if (dev_id == 0x0413U || dev_id == 0x0419U || dev_id == 0x0431U ||
+        dev_id == 0x0441U || dev_id == 0x0458U) {
+        rom_base = ROM_BL_ADDR_F4;       /* STM32F4xx family */
+    }
+
+    uint32_t rom_sp = *(volatile uint32_t *)rom_base;
+    uint32_t rom_pc = *(volatile uint32_t *)(rom_base + 4);
+
+    /* Sanity-check: SP must point into SRAM (0x20000000+), PC must be odd
+     * (Thumb bit set) and point into system flash space (< 0x20000000). */
+    if ((rom_sp & 0xFF000000UL) != 0x20000000UL) return;   /* bad SP, stay in BL */
+    if ((rom_pc & 1) == 0 || rom_pc < 0x10000000UL) return;
+
+    SCB_VTOR = rom_base;       /* relocate vector table to ROM BL */
+    __asm volatile("msr msp, %0\n" : : "r"(rom_sp));
+    __asm volatile("bx  %0\n"     : : "r"(rom_pc));
+    __builtin_unreachable();
 }
 
 /* ----------------------------------------------------------------------- */
@@ -329,9 +393,18 @@ static void handle_ctrl_cmd(const uint8_t *data, uint8_t len)
         break;
 
     case BL_CMD_STATUS:
-        /* Send all 3 banner frames (frame-0 carries cmd echo 0x07 + STATUS_OK
-         * so the host knows a query was answered, not just an auto-broadcast). */
         bl_broadcast_status();
+        break;
+
+    case BL_CMD_ENTER_DFU:
+        /* Jump to STM32 ROM DFU bootloader.
+         * Device will enumerate as VID_0483:PID_DF11 — recognised by
+         * STM32CubeProgrammer and dfu-util after Zadig assigns WinUSB. */
+        ctrl_respond(BL_CMD_ENTER_DFU, BL_STATUS_OK, 0);
+        delay_ms(50);              /* let the ACK frame transmit */
+        enter_rom_dfu();
+        /* If we get here the board has no USB / ROM BL is invalid */
+        ctrl_respond(BL_CMD_ENTER_DFU, BL_STATUS_FLASH_ERR, 0);
         break;
 
     default:
@@ -577,6 +650,8 @@ static void uart_menu(void)
     usart_print(" [4] Set next boot: Slot A\r\n");
     usart_print(" [5] Set next boot: Slot B\r\n");
     usart_print(" [6] Clear NVRAM (settings at 0x0803F000)\r\n");
+    usart_print(" [7] Enter USB DFU (ROM bootloader, VID_0483:PID_DF11)\r\n");
+    usart_print("     Use STM32CubeProgrammer or dfu-util on Windows/Linux\r\n");
     usart_print(" [0] Boot application\r\n");
     usart_print("===================================\r\n");
     usart_print("Choice [0-6]: ");
@@ -677,6 +752,21 @@ static void uart_menu(void)
         jump_to_slot(g_config.boot_slot);
         break;
 
+    case '7':
+        /* Enter STM32 ROM DFU bootloader.
+         * The device will enumerate as VID_0483:PID_DF11 on USB.
+         * Windows: install STM32CubeProgrammer (recommended) or use Zadig
+         *   to assign WinUSB to the device, then use dfu-util.
+         * If the board has no USB connector this option does nothing. */
+        usart_print("Entering USB DFU mode (VID_0483:PID_DF11)...\r\n");
+        usart_print("Connect USB, open STM32CubeProgrammer, select USB DFU.\r\n");
+        delay_ms(200);
+        enter_rom_dfu();
+        /* If enter_rom_dfu() returns (board has no USB or ROM BL is broken): */
+        usart_print("ROM DFU unavailable on this board — using CAN/UART only.\r\n");
+        jump_to_slot(g_config.boot_slot);
+        break;
+
     default:
         usart_print("Invalid.\r\n");
         jump_to_slot(g_config.boot_slot);
@@ -717,9 +807,21 @@ int main(void)
         /* Enable PWR + BKP clocks and drop write-protection on backup domain */
         RCC_APB1ENR |= RCC_APB1ENR_PWREN | RCC_APB1ENR_BKPEN;
         PWR_CR |= PWR_CR_DBP;
+
         if (BKP_DR1 == BKP_MAGIC_ENTER_BL) {
-            BKP_DR1 = 0x0000U;        /* consume the flag immediately */
-            poll_ms = 30000U;         /* extended: 30 s */
+            BKP_DR1 = 0x0000U;        /* consume the flag */
+            poll_ms = 30000U;         /* extended window: 30 s */
+        }
+
+        /* BKP_DR2 = 0xDFD0 → jump to STM32 ROM DFU bootloader.
+         * Set by the application before reset to enter USB DFU on Windows.
+         * This makes the device appear as VID_0483:PID_DF11 which Windows
+         * recognises (with STM32CubeProgrammer / Zadig+dfu-util).
+         * Must clear BKP first so a broken DFU doesn't loop into ROM BL. */
+        if (BKP_DR2 == BKP_MAGIC_ENTER_DFU) {
+            BKP_DR2 = 0x0000U;        /* consume — clear before jumping */
+            enter_rom_dfu();
+            /* If enter_rom_dfu() returns (invalid SP/PC), continue normally */
         }
     }
 

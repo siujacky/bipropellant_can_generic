@@ -68,6 +68,7 @@ BL_CMD_SET_BOOT_A    = 0x04
 BL_CMD_SET_BOOT_B    = 0x05
 BL_CMD_CLEAR_NVRAM   = 0x06
 BL_CMD_STATUS        = 0x07
+BL_CMD_ENTER_DFU     = 0x08   # Jump to ROM DFU (VID_0483:PID_DF11)
 
 # Control response status codes
 BL_STATUS_OK         = 0x00
@@ -512,11 +513,13 @@ Examples:
                           help="Tell bootloader to jump to application now")
     ctrl_grp.add_argument("--status",      action="store_true",
                           help="Query bootloader status (boot slot, UID0)")
+    ctrl_grp.add_argument("--enter-dfu",  action="store_true", dest="enter_dfu",
+                          help="Enter STM32 ROM DFU (VID_0483:PID_DF11); fixes Windows USB error")
 
     args = parser.parse_args()
 
     # Validate arguments
-    control_only = bool(args.set_boot or args.clear_nvram or args.boot or args.status)
+    control_only = bool(args.set_boot or args.clear_nvram or args.boot or args.status or args.enter_dfu)
     if not args.firmware and not control_only:
         parser.error("Provide -f FIRMWARE and/or a control command (--status, --set-boot, etc.)")
 
@@ -557,6 +560,12 @@ Examples:
         if args.boot:
             ctrl_boot(bus, uid0_auth)
             return   # board is jumping to app
+
+        if args.enter_dfu:
+            print("  Sending ENTER_DFU command (board will reboot as VID_0483:PID_DF11)...")
+            send_ctrl_cmd(bus, BL_CMD_ENTER_DFU, uid0_auth, timeout=2.0)
+            print("  Done. Connect USB and open STM32CubeProgrammer (Windows) or dfu-util.")
+            return
 
         # ---- Firmware upload -----------------------------------------------
         if not args.firmware:

@@ -76,6 +76,24 @@ typedef struct {
 #define DBGMCU_IDCODE      (*(volatile uint32_t *)0xE0042000UL)
 #define FLASHSIZE_REG      (*(volatile uint16_t *)0x1FFFF7E0UL)
 
+/* ---- SysTick (needed to disable before ROM DFU jump) ---- */
+#define SYSTICK_BASE   0xE000E010UL
+#define SYST_CSR       (*(volatile uint32_t *)(SYSTICK_BASE + 0x00))
+#define SYST_RVR       (*(volatile uint32_t *)(SYSTICK_BASE + 0x04))
+#define SYST_CVR       (*(volatile uint32_t *)(SYSTICK_BASE + 0x08))
+
+/* ---- STM32 ROM bootloader (system memory) addresses ----
+ * Each family has its own address (AN2606, Table 2).
+ * The bootloader reads BOOT0/BOOT1 state at reset AND honours a direct
+ * call from application code if peripherals are cleanly reset first.
+ */
+#define ROM_BL_ADDR_F1   0x1FFFF000UL   /* STM32F103xx  (Cortex-M3)  → USB DFU VID_0483:PID_DF11 */
+#define ROM_BL_ADDR_F4   0x1FFF0000UL   /* STM32F4xx    (Cortex-M4F) → USB DFU VID_0483:PID_DF11 */
+
+/* Magic for BKP_DR2 to trigger ROM DFU on next reset (separate from BKP_DR1's
+ * enter-our-bootloader magic). */
+#define BKP_MAGIC_ENTER_DFU   0xDFD0U   /* "DFU-Device-0" */
+
 /* ---- NVIC disable-all helper ---- */
 #define NVIC_ICER0  (*(volatile uint32_t *)0xE000E180UL)
 #define NVIC_ICER1  (*(volatile uint32_t *)0xE000E184UL)
@@ -97,7 +115,8 @@ typedef struct {
  * 30 s instead of the normal 500 ms.
  */
 #define BKP_BASE            0x40006C00UL
-#define BKP_DR1             (*(volatile uint16_t *)(BKP_BASE + 0x04))
+#define BKP_DR1             (*(volatile uint16_t *)(BKP_BASE + 0x04))  /* enter-our-BL flag */
+#define BKP_DR2             (*(volatile uint16_t *)(BKP_BASE + 0x08))  /* enter-ROM-DFU flag */
 #define BKP_MAGIC_ENTER_BL  0xB001U   /* "Boot-One" — arbitrary, unlikely to
                                         * appear by accident on power-on     */
 
