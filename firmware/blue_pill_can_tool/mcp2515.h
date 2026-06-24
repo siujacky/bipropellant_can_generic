@@ -92,10 +92,10 @@
 #define MCP_TXSIDL_EXIDE    (1U << 3)  /* Extended frame enable */
 
 /* TXBnCTRL bits */
-#define MCP_TXCTRL_TXREQ    (1U << 3)  /* TX request bit */
-#define MCP_TXCTRL_ABTF     (1U << 6)  /* Aborted frame */
-#define MCP_TXCTRL_MLOA     (1U << 5)  /* Message lost arbitration */
-#define MCP_TXCTRL_TXERR    (1U << 4)  /* TX error detected */
+#define MCP_TXCTRL_TXREQ    (1U << 2)  /* TX request  — DS21801J bit 2 */
+#define MCP_TXCTRL_ABTF     (1U << 5)  /* Aborted flag — DS21801J bit 5 */
+#define MCP_TXCTRL_MLOA     (1U << 4)  /* Lost arbitration — DS21801J bit 4 */
+#define MCP_TXCTRL_TXERR    (1U << 3)  /* TX error — DS21801J bit 3 */
 
 /* TXBnDLC bits */
 #define MCP_DLC_RTR         (1U << 6)  /* Remote Transmission Request */

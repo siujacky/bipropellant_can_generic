@@ -47,7 +47,7 @@
 #define MCP_TXB0EID0    0x34
 #define MCP_TXB0DLC     0x35
 #define MCP_TXB0D0      0x36
-#define MCP_TXCTRL_TXREQ 0x08
+#define MCP_TXCTRL_TXREQ 0x04  /* bit 2 per DS21801J */
 
 /* RXB1 registers */
 #define MCP_RXB1SIDH    0x71
@@ -60,5 +60,12 @@ void     mcp2515_init(void);
 void     mcp2515_tx(uint16_t id, const uint8_t *data, uint8_t len);
 int      mcp2515_rx_available(void);
 int      mcp2515_rx(uint16_t *id_out, uint8_t *data_out, uint8_t *len_out);
+
+/* Debug vars — all readable via SWD.
+ * g_bl_canstat: 0x00=normal OK, 0x80=CONFIG, 0xFF=SPI dead (set at end of init)
+ * g_bl_txb0ctrl: 0x00=tx success, 0x10=ABTF/no-ack, 0xFF=SPI dead (set after 1st tx) */
+extern volatile uint8_t g_bl_canstat;
+extern volatile uint8_t g_bl_canctrl;
+extern volatile uint8_t g_bl_txb0ctrl;
 
 #endif /* MCP2515_BL_H */

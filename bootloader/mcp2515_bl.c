@@ -28,7 +28,7 @@ static void gpio_init(void)
     GPIOA->CRL = (GPIOA->CRL & ~(0xFU << 16)) | (0x3U << 16);
     /* PA5 (SCK) : SPI1_SCK AF push-pull 50MHz: CRL bits[23:20] */
     GPIOA->CRL = (GPIOA->CRL & ~(0xFU << 20)) | (0xBU << 20);
-    /* PA6 (MISO): SPI1_MISO floating input: CRL bits[27:24] */
+    /* PA6 (MISO): SPI1_MISO floating input (5V tolerant on STM32F103) */
     GPIOA->CRL = (GPIOA->CRL & ~(0xFU << 24)) | (0x4U << 24);
     /* PA7 (MOSI): SPI1_MOSI AF push-pull 50MHz: CRL bits[31:28] */
     GPIOA->CRL = (GPIOA->CRL & ~(0xFU << 28)) | (0xBU << 28);
@@ -78,19 +78,39 @@ void mcp2515_init(void) {
     mcp_write_reg(MCP_CNF3, 0x03);
     mcp_write_reg(MCP_RXB0CTRL, 0x64);  /* accept all + BUKT */
     mcp_write_reg(MCP_CANINTE,  0x00);
-    /* Enter normal mode with OSM (One-Shot Mode, CANCTRL bit 3).
-     * OSM = each TX is attempted ONCE; if no ACK the ABTF flag is set and
-     * TXREQ clears immediately. Without OSM the MCP2515 retries the first
-     * hello indefinitely → floods bus with error frames → Pico 2 gets
-     * RXWARN/RXEP and never receives a valid frame.  With OSM the main loop
-     * can retry at a controlled 50ms interval instead. */
-    mcp_write_reg(MCP_CANCTRL,  MCP_MODE_NORMAL | 0x08U);  /* NORMAL + OSM */
-    delay_ms(1);
+    /* Two-step: first enter NORMAL mode (CANCTRL = 0x00, all bytes LOW → always
+     * works even at 5V), then enable OSM (bit 3) via a second write (0x08 =
+     * 00001000b, bit 3 HIGH — marginal at 5V but works more reliably than the
+     * one-step 0x08 write done during the CONFIG→NORMAL transition).
+     * With OSM=1: each TX attempt is made ONCE; no bus-flooding on no-ACK. */
+    mcp_write_reg(MCP_CANCTRL, MCP_MODE_NORMAL);  /* step 1: enter NORMAL (all zeros) */
+    delay_ms(2);                                   /* wait for mode transition */
+    /* step 2: set OSM — retry up to 5 times */
+    uint8_t canctrl_rb;
+    for (int try = 0; try < 5; try++) {
+        mcp_write_reg(MCP_CANCTRL, 0x08U);         /* NORMAL mode + OSM (bit 3) */
+        delay_ms(1);
+        canctrl_rb = mcp_read_reg(MCP_CANCTRL);
+        if ((canctrl_rb & 0x08U) == 0x08U) break;  /* OSM set correctly */
+    }
+    g_bl_canstat = mcp_read_reg(MCP_CANSTAT);
+    g_bl_canctrl = canctrl_rb;
 }
+
+volatile uint8_t g_bl_canstat;
+volatile uint8_t g_bl_canctrl;
 
 int mcp2515_rx_available(void) {
     return (mcp_read_reg(MCP_CANINTF) & (MCP_CANINTF_RX0IF | MCP_CANINTF_RX1IF)) ? 1 : 0;
 }
+
+/* g_bl_txb0ctrl: TXB0CTRL read after first TX attempt.
+ * 0x00 = TX success (TXREQ cleared, no error).
+ * 0x10 = ABTF (frame attempted, not ACKed, aborted by OSM).
+ * 0x08 = TXREQ still set (stuck — OSM may not have cleared it).
+ * 0xFF = SPI dead (all reads return 0xFF). */
+volatile uint8_t g_bl_txb0ctrl = 0xAA; /* 0xAA = not yet set */
+static uint8_t g_bl_tx_done;
 
 void mcp2515_tx(uint16_t id, const uint8_t *data, uint8_t len) {
     if (len > 8) len = 8;
@@ -103,9 +123,14 @@ void mcp2515_tx(uint16_t id, const uint8_t *data, uint8_t len) {
     mcp_write_reg(MCP_TXB0EID0, 0x00);
     mcp_write_reg(MCP_TXB0DLC,  len & 0x0F);
     for (uint8_t i = 0; i < len; i++) mcp_write_reg(MCP_TXB0D0 + i, data[i]);
-    CS_LOW(); spi_xfer(MCP_RTS_TXB0); CS_HIGH();
+    /* Start TX via register write (WRITE=0x02, MSB=0) instead of the RTS
+     * instruction (0x81, MSB=1). At 5V VCC, MCP2515 VIH_min=3.5V exceeds the
+     * STM32's 3.3V push-pull HIGH, so the MSB of the first SPI byte can be
+     * misread. WRITE (0x02) has MSB=0 and works reliably. */
+    mcp_write_reg(MCP_TXB0CTRL, MCP_TXCTRL_TXREQ);
     timeout = 50000;
     while ((mcp_read_reg(MCP_TXB0CTRL) & MCP_TXCTRL_TXREQ) && --timeout);
+    if (!g_bl_tx_done) { g_bl_txb0ctrl = mcp_read_reg(MCP_TXB0CTRL); g_bl_tx_done = 1; }
 }
 
 int mcp2515_rx(uint16_t *id_out, uint8_t *data_out, uint8_t *len_out) {

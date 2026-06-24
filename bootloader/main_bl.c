@@ -857,7 +857,7 @@ int main(void)
     bl_config_read(&g_config);
 
     /* 3. Init both transports */
-    mcp2515_init();
+    mcp2515_init();   /* g_bl_canstat / g_bl_canctrl populated for SWD inspection */
     usart_init();
 
     /* ----------------------------------------------------------------
@@ -954,11 +954,15 @@ int main(void)
         uint16_t can_id;
         if (mcp2515_rx(&can_id, rx_buf, &rx_len)) {
             if (can_id == CAN_RX_ID && rx_len >= 4) {
-                uint32_t master_uid2 = (uint32_t)rx_buf[0]
-                                     | ((uint32_t)rx_buf[1] << 8)
-                                     | ((uint32_t)rx_buf[2] << 16)
-                                     | ((uint32_t)rx_buf[3] << 24);
-                if (master_uid2 == DESIG_UNIQUE_ID2) {
+                /* Compare received 4 bytes against UID0 (not UID2 — UID0 is
+                 * the value broadcast in the hello frame and returned by the
+                 * host.  Using UID2 here was a mismatch: hello contains UID0
+                 * so the host never had UID2 to send back. */
+                uint32_t master_uid = (uint32_t)rx_buf[0]
+                                    | ((uint32_t)rx_buf[1] << 8)
+                                    | ((uint32_t)rx_buf[2] << 16)
+                                    | ((uint32_t)rx_buf[3] << 24);
+                if (master_uid == DESIG_UNIQUE_ID0) {
                     g_transport = TRANSPORT_CAN;
                     break;
                 }

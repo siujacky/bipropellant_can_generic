@@ -212,8 +212,14 @@ void mcp2515_init(uint8_t brate)
  * ----------------------------------------------------------------------- */
 int mcp2515_enter_normal(void)
 {
+    /* Two-step: enter normal mode first (0x00 = all bits LOW → reliable at any
+     * VCC), then set OSM (bit 3 = 0x08) in a second write.  Without OSM a
+     * failed TX retries indefinitely → bus-off.  mcp_bit_modify (0x05) is used
+     * for the OSM step because its instruction byte has MSB=0 (reliable). */
     mcp_write_reg(MCP_CANCTRL, MCP_MODE_NORMAL);
     delay_ms(2);
+    mcp_bit_modify(MCP_CANCTRL, 0x08U, 0x08U);  /* set OSM */
+    delay_ms(1);
     uint8_t stat = mcp_read_reg(MCP_CANSTAT);
     return ((stat & MCP_MODE_MASK) == MCP_MODE_NORMAL) ? 0 : -1;
 }
@@ -268,10 +274,9 @@ int mcp2515_tx(uint32_t id, const uint8_t *data, uint8_t len, int extended)
     for (uint8_t i = 0; i < len; i++)
         mcp_write_reg(MCP_TXB0D0 + i, data[i]);
 
-    /* Request transmit */
-    CS_LOW();
-    spi_xfer(MCP_RTS_TXB0);
-    CS_HIGH();
+    /* Request transmit via register write (avoids RTS instruction 0x81 whose
+     * MSB=1 may not be recognised at 5V VCC with 3.3V MOSI push-pull). */
+    mcp_write_reg(MCP_TXB0CTRL, MCP_TXCTRL_TXREQ);
 
     /* Wait for TX complete (TXREQ clears) with timeout */
     timeout = 50000;
@@ -313,9 +318,7 @@ int mcp2515_tx_rtr(uint32_t id, uint8_t dlc, int extended)
     /* DLC with RTR bit set */
     mcp_write_reg(MCP_TXB0DLC, (dlc & 0x0F) | MCP_DLC_RTR);
 
-    CS_LOW();
-    spi_xfer(MCP_RTS_TXB0);
-    CS_HIGH();
+    mcp_write_reg(MCP_TXB0CTRL, MCP_TXCTRL_TXREQ);  /* set TXREQ via WRITE (MSB=0) */
 
     timeout = 50000;
     while ((mcp_read_reg(MCP_TXB0CTRL) & MCP_TXCTRL_TXREQ) && --timeout);

@@ -87,26 +87,54 @@ def slcan_send(s: serial.Serial, can_id: int, data: bytes) -> None:
     cmd = f't{hex_id}{dlc}{hex_data}\r'.encode()
     s.write(cmd)
 
+def _read_until_cr(s: serial.Serial, timeout: float) -> bytes:
+    """Read one SLCAN line (terminated by \\r, never \\n). Returns b'' on timeout."""
+    deadline = time.monotonic() + timeout
+    buf = b''
+    while time.monotonic() < deadline:
+        remaining = deadline - time.monotonic()
+        s.timeout = min(remaining + 0.01, 0.1)
+        ch = s.read(1)
+        if not ch:
+            continue
+        if ch == b'\r':
+            return buf
+        buf += ch
+    return buf
+
 def slcan_recv_line(s: serial.Serial, timeout: float = 0.5) -> bytes:
-    s.timeout = timeout
-    line = s.readline()
-    return line
+    return _read_until_cr(s, timeout)
 
 def slcan_recv_frame(s: serial.Serial, timeout: float = 1.0) -> tuple:
-    """Return (can_id, data_bytes) from next received SLCAN frame, or (None, None)."""
-    s.timeout = timeout
-    line = s.readline().strip()
-    if not line:
-        return None, None
-    try:
-        line = line.decode('ascii', errors='ignore')
-        if line.startswith('t') and len(line) >= 5:
-            can_id = int(line[1:4], 16)
-            dlc    = int(line[4], 16)
-            data   = bytes.fromhex(line[5:5 + dlc * 2])
-            return can_id, data
-    except Exception:
-        pass
+    """Return (can_id, data_bytes) from next received SLCAN CAN frame.
+
+    Skips TX-ack lines ('z', 'Z') and other non-frame responses.
+    SLCAN uses \\r (not \\n) as line terminator; readline() must NOT be used.
+    Returns (None, None) if no CAN frame arrives before timeout.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        remaining = deadline - time.monotonic()
+        line = _read_until_cr(s, min(remaining, 0.2))
+        if not line:
+            continue
+        try:
+            text = line.decode('ascii', errors='ignore').strip()
+            # Skip TX-ack lines and other non-RX lines
+            if not text or text[0] not in ('t', 'T'):
+                continue
+            if text[0] == 't' and len(text) >= 5:
+                can_id = int(text[1:4], 16)
+                dlc    = int(text[4], 16)
+                data   = bytes.fromhex(text[5:5 + dlc * 2])
+                return can_id, data
+            if text[0] == 'T' and len(text) >= 10:
+                can_id = int(text[1:9], 16)
+                dlc    = int(text[9], 16)
+                data   = bytes.fromhex(text[10:10 + dlc * 2])
+                return can_id, data
+        except Exception:
+            pass
     return None, None
 
 
