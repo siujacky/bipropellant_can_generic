@@ -49,7 +49,7 @@ LOAD flash_bl.o
 LOAD main_bl.o
                 0x20001000                        _estack = (ORIGIN (RAM) + LENGTH (RAM))
 
-.text           0x08000000     0x176c
+.text           0x08000000     0x1794
  *(.isr_vector)
  .isr_vector    0x08000000       0x40 startup_bl.o
  *(.text)
@@ -122,53 +122,53 @@ LOAD main_bl.o
  .text.bl_broadcast_status
                 0x08000740       0xf4 main_bl.o
  .text.enter_rom_dfu
-                0x08000834       0xd4 main_bl.o
+                0x08000834       0xfc main_bl.o
  .text.jump_to_app_at
-                0x08000908       0x24 main_bl.o
+                0x08000930       0x24 main_bl.o
  .text.jump_to_slot
-                0x0800092c       0x1c main_bl.o
+                0x08000954       0x1c main_bl.o
  .text.send_byte
-                0x08000948       0x2c main_bl.o
+                0x08000970       0x2c main_bl.o
  .text.ctrl_respond.constprop.0
-                0x08000974       0x3c main_bl.o
+                0x0800099c       0x3c main_bl.o
  .text.bl_config_write.constprop.0
-                0x080009b0       0x3c main_bl.o
+                0x080009d8       0x3c main_bl.o
  .text.crc32_page.constprop.0
-                0x080009ec       0x48 main_bl.o
+                0x08000a14       0x48 main_bl.o
  .text.uart_do_upload
-                0x08000a34       0xbc main_bl.o
+                0x08000a5c       0xbc main_bl.o
  .text.startup.main
-                0x08000af0      0x800 main_bl.o
-                0x08000af0                main
+                0x08000b18      0x800 main_bl.o
+                0x08000b18                main
  *(.rodata)
  *(.rodata.*)
- .rodata.hex.0  0x080012f0       0x11 usart_bl.o
- *fill*         0x08001301        0x3 
+ .rodata.hex.0  0x08001318       0x11 usart_bl.o
+ *fill*         0x08001329        0x3 
  .rodata.main.str1.4
-                0x08001304      0x467 main_bl.o
-                0x0800176c                        . = ALIGN (0x4)
- *fill*         0x0800176b        0x1 
-                0x0800176c                        _etext = .
+                0x0800132c      0x467 main_bl.o
+                0x08001794                        . = ALIGN (0x4)
+ *fill*         0x08001793        0x1 
+                0x08001794                        _etext = .
 
-.glue_7         0x0800176c        0x0
- .glue_7        0x0800176c        0x0 linker stubs
+.glue_7         0x08001794        0x0
+ .glue_7        0x08001794        0x0 linker stubs
 
-.glue_7t        0x0800176c        0x0
- .glue_7t       0x0800176c        0x0 linker stubs
+.glue_7t        0x08001794        0x0
+ .glue_7t       0x08001794        0x0 linker stubs
 
-.vfp11_veneer   0x0800176c        0x0
- .vfp11_veneer  0x0800176c        0x0 linker stubs
+.vfp11_veneer   0x08001794        0x0
+ .vfp11_veneer  0x08001794        0x0 linker stubs
 
-.v4_bx          0x0800176c        0x0
- .v4_bx         0x0800176c        0x0 linker stubs
+.v4_bx          0x08001794        0x0
+ .v4_bx         0x08001794        0x0 linker stubs
 
-.iplt           0x0800176c        0x0
- .iplt          0x0800176c        0x0 startup_bl.o
+.iplt           0x08001794        0x0
+ .iplt          0x08001794        0x0 startup_bl.o
 
-.rel.dyn        0x0800176c        0x0
- .rel.iplt      0x0800176c        0x0 startup_bl.o
+.rel.dyn        0x08001794        0x0
+ .rel.iplt      0x08001794        0x0 startup_bl.o
 
-.data           0x20000000        0x8 load address 0x0800176c
+.data           0x20000000        0x8 load address 0x08001794
                 0x20000000                        _sdata = .
  *(.data)
  *(.data.*)
@@ -178,12 +178,12 @@ LOAD main_bl.o
                 0x20000004        0x4 main_bl.o
                 0x20000008                        . = ALIGN (0x4)
                 0x20000008                        _edata = .
-                0x0800176c                        _ldata = LOADADDR (.data)
+                0x08001794                        _ldata = LOADADDR (.data)
 
-.igot.plt       0x20000008        0x0 load address 0x08001774
+.igot.plt       0x20000008        0x0 load address 0x0800179c
  .igot.plt      0x20000008        0x0 startup_bl.o
 
-.bss            0x20000008      0x424 load address 0x08001774
+.bss            0x20000008      0x424 load address 0x0800179c
                 0x20000008                        _sbss = .
  *(.bss)
  *(.bss.*)

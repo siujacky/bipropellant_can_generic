@@ -142,34 +142,44 @@ python3 tools/detect_chip.py -d can0
 
 **Partially yes, with one important caveat (same answer for F401 and F411).**
 
-| Chip | DevID | Flash | SRAM | Max MHz | TIM8? | Windows USB |
-|---|---|---|---|---|---|---|
-| STM32F401CCU6 (Black Pill v1) | 0x0423 | 256 KB | 64 KB | 84 | ❌ | Driver-free |
-| STM32F401CEU6 | 0x0433 | 512 KB | 96 KB | 84 | ❌ | Driver-free |
-| STM32F411CEU6 (Black Pill v2) | 0x0431 | 512 KB | 128 KB | 100 | ❌ | Driver-free |
-| STM32F103RCT6 (hoverboard) | 0x0414 | 256 KB | 48 KB | 72 | ✅ | Needs Zadig |
+| Chip | DevID | Flash | SRAM | MHz | TIM8? | Native CAN | Windows USB |
+|---|---|---|---|---|---|---|---|
+| **STM32G474CEU6** | **0x0469** | **512 KB** | **128 KB** | **170** | **✅** | **FDCAN FD** | Driver-free |
+| STM32F103RCT6 (hoverboard) | 0x0414 | 256 KB | 48 KB | 72 | ✅ | via MCP2515 | Needs Zadig |
+| STM32F401CCU6 (Black Pill v1) | 0x0423 | 256 KB | 64 KB | 84 | ❌ | via MCP2515 | Driver-free |
+| STM32F401CEU6 | 0x0433 | 512 KB | 96 KB | 84 | ❌ | via MCP2515 | Driver-free |
+| STM32F411CEU6 (Black Pill v2) | 0x0431 | 512 KB | 128 KB | 100 | ❌ | via MCP2515 | Driver-free |
 
-| Feature | F103 | F401 / F411 | Works? |
-|---|---|---|---|
-| Bootloader (CAN+UART+USB DFU) | ✅ | ✅ | Yes — ROM DFU at 0x1FFF0000 (DevID now in table) |
-| chip_detect.c | ✅ | ✅ | Yes — 0x0423/0x0433 (F401) + 0x0431 (F411) added |
-| uart_hdsel, PhaseMap, chip_detect | ✅ | ✅ | Yes — HAL-based, family-agnostic |
-| Single-motor drive (TIM1) | ✅ | ✅ | Yes — TIM1 pin mapping is **identical** on all three |
-| **Dual-motor drive (TIM1+TIM8)** | ✅ | **❌** | **No — F401/F411 have no TIM8** |
-| USB on Windows | Needs Zadig | **Driver-free** | F4 USB OTG = no driver install needed |
+| Feature | F103 | F401/F411 | **G474** | Notes |
+|---|---|---|---|---|
+| Bootloader (CAN+UART+USB DFU) | ✅ | ✅ | ✅ | G4 ROM DFU at 0x1FFF0000 — same as F4 |
+| chip_detect.c | ✅ | ✅ | ✅ | G474 DevID 0x0469 added |
+| uart_hdsel, PhaseMap, detect | ✅ | ✅ | ✅ | HAL-based, family-agnostic |
+| Single-motor drive (TIM1) | ✅ | ✅ | ✅ | TIM1 pin mapping identical on all |
+| **Dual-motor (TIM1+TIM8)** | ✅ | ❌ | **✅** | G474 has TIM8 — same as F103! |
+| Native CAN (no MCP2515) | ❌ | ❌ | **✅** | G474 FDCAN1/2, CAN FD + 2.0B compat |
+| USB on Windows | Needs Zadig | Driver-free | **Driver-free** | G4 HSI48 = crystal-free USB |
+| HRTIM dead-time | ❌ | ❌ | **✅** | 184 ps resolution for FOC |
+| On-chip current sense OpAmps | ❌ | ❌ | **✅** | 3× OpAmps, no external ICs needed |
 
-**TIM1 pins are identical across F103, F401, F411:**
+**TIM1 and TIM8 pin mapping is identical on F103, G474:**
 ```
-High-side: PA8(CH1)  PA9(CH2)  PA10(CH3)
-Low-side:  PB13(CH1N) PB14(CH2N) PB15(CH3N)
+Right motor TIM1: PA8(CH1)  PA9(CH2)  PA10(CH3)  high-side
+                  PB13(CH1N) PB14(CH2N) PB15(CH3N) low-side
+Left motor  TIM8: PC6(CH1)  PC7(CH2)  PC8(CH3)    high-side
+                  PA7(CH1N)  PB0(CH2N)  PB1(CH3N)  low-side
 ```
-So the right-motor wiring from a hoverboard board drops straight in.
-Left motor needs external dead-time gate driver (F401/F411 have no TIM8 equivalent).
+Existing hoverboard wiring drops straight in on G474.
 
-**F401 vs F411 for this project:**
-- Flash: F401CC = 256KB (same as F103), F411CE = 512KB
-- Both need F4 HAL (`stm32f4xx_hal`) not F1 HAL
-- Both enumerate USB as VID_0483:PID_DF11 in DFU mode (no driver needed)
+**G474 CAN FD advantage:** Instead of MCP2515 (SPI overhead, 500 kbps max), use the
+native FDCAN peripheral with a TJA1042 or SIT65HVD230 transceiver. Backwards compatible
+with the existing bipropellant CAN protocol at 500 kbps; future upgrade path to 2 Mbit/s+.
+See `src/hal_motor_stm32g4.c` for the dual-motor scaffold and FDCAN integration notes.
 
-See `bootloader/hal_motor_stm32f4.c` for the single-motor stub. To build for F401/F411:
-create a Makefile env with `-DSTM32F401xC` or `-DSTM32F411xE` + F4 HAL + startup/ld.
+**To build for G474:** create a Makefile env with `-DBOARD_FAMILY_STM32G4 -DSTM32G474xx`
++ stm32g4xx HAL + startup_stm32g474xe.s + STM32G474CETx_FLASH.ld.
+
+**G4 variants covered:**
+- G4 Cat.2 (G431/G441): DevID 0x0468 — no TIM8, limited
+- **G4 Cat.3 (G474/G484): DevID 0x0469** — full TIM1+TIM8+TIM20+FDCAN+HRTIM
+- G4 Cat.4 (G491/G4A1): DevID 0x0479 — single FDCAN, no HRTIM

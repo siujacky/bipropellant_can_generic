@@ -37,6 +37,10 @@ static const dev_entry_t k_devices[] = {
     { 0x0434, 256,"STM32F469/F479",    "F4"     },
     { 0x0441, 128,"STM32F412",         "F4"     },
     { 0x0449, 256,"STM32F7xx",         "F7"     },
+    /* STM32G4 — important: G474/G484 have TIM1+TIM8+TIM20, native CAN FD */
+    { 0x0468,  32,"STM32G431/G441",   "G4-Cat2"},  /* Cat.2: no TIM8, limited */
+    { 0x0469, 128,"STM32G474/G484",   "G4-Cat3"},  /* Cat.3: TIM1+TIM8+TIM20+FDCAN, HRTIM */
+    { 0x0479,  96,"STM32G491/G4A1",   "G4-Cat4"},  /* Cat.4: single FDCAN, no HRTIM */
     /* GD32 (some share IDs with STM32 for drop-in compatibility) */
     { 0xA641, 20, "GD32F103 (med)",    "medium" },
     { 0xB641, 48, "GD32F103 (high)",   "high"   },

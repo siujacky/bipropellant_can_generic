@@ -47,6 +47,10 @@ DEVICE_IDS = {
     0x0434: ("STM32F469/F479",   "F4",             256),
     0x0441: ("STM32F412",        "F4",             128),
     0x0449: ("STM32F7xx",        "F7",             256),
+    # STM32G4 — G474/G484 have TIM1+TIM8+TIM20, native CAN FD, HRTIM
+    0x0468: ("STM32G431/G441",   "G4-Cat2",         32),
+    0x0469: ("STM32G474/G484",   "G4-Cat3",        128),  # dual-motor + CAN FD
+    0x0479: ("STM32G491/G4A1",   "G4-Cat4",         96),
     # GD32
     0xA641: ("GD32F103 (medium)", "medium",         20),
     0xB641: ("GD32F103 (high)",   "high",           48),
