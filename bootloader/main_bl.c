@@ -474,7 +474,8 @@ static int recv_bytes(uint8_t *buf, uint32_t want, uint32_t timeout_ms)
                 }
             }
             if (!found) return 0;
-            uint8_t take = (rx_len < (uint8_t)(want - got)) ? rx_len : (uint8_t)(want - got);
+            uint32_t remain2 = want - got;
+            uint8_t  take    = (rx_len < remain2) ? rx_len : (uint8_t)remain2;
             for (uint8_t i = 0; i < take; i++)
                 buf[got++] = tmp[i];
         }
@@ -597,8 +598,12 @@ can_page_retry:;
                            | ((uint32_t)tmp[2] << 16)
                            | ((uint32_t)tmp[3] << 24);
             } else {
-                /* Frames 0-127: 8 bytes each = 1024 bytes of page data */
-                uint8_t take = (rlen < (uint8_t)(1024 - byte_idx)) ? rlen : (uint8_t)(1024 - byte_idx);
+                /* Frames 0-127: 8 bytes each = 1024 bytes of page data.
+                 * CRITICAL: must NOT cast (1024-byte_idx) to uint8_t before the
+                 * comparison — when byte_idx=0, (uint8_t)(1024-0)=(uint8_t)1024=0,
+                 * making take=0 and copying nothing.  Keep remain as uint32_t. */
+                uint32_t remain = 1024U - byte_idx;
+                uint8_t  take   = (rlen < remain) ? rlen : (uint8_t)remain;
                 for (uint8_t b = 0; b < take; b++)
                     page_buf[byte_idx++] = tmp[b];
             }
