@@ -51,7 +51,7 @@ void bxcan_init(void) {
     volatile uint32_t t = 100000;
     while (t-- && !(CAN1->MSR & CAN_MSR_INAK));
 
-    /* 250kbps @ 8MHz: BRP=1, TS1=11, TS2=2, SJW=0 → 16 Tq, 75% SP */
+    /* 250kbps @ 8MHz HSI: BRP=1(div=2) TS1=11(12Tq) TS2=2(3Tq) → 16Tq, 81.25% SP */
     CAN1->BTR = (0U<<28)|(0U<<24)|(2U<<20)|(11U<<16)|(1U<<0);
 
     /* Filter 0: accept all standard frames on FIFO0 (mask=0) */
@@ -70,11 +70,11 @@ void bxcan_init(void) {
     while (t-- && (CAN1->MSR & CAN_MSR_INAK));
 }
 
-void bxcan_tx(uint16_t id, const uint8_t *data, uint8_t len) {
+int bxcan_tx(uint16_t id, const uint8_t *data, uint8_t len) {
     if (len > 8) len = 8;
     volatile uint32_t t = 50000;
     while (!(CAN1->TSR & CAN_TSR_TME0) && --t);
-    if (!t) return;
+    if (!t) return 0;  /* mailbox busy */
 
     CAN1->TXB[0].TIR  = (uint32_t)id << 21;  /* standard 11-bit, no RTR */
     CAN1->TXB[0].TDTR = len & 0xFU;
@@ -84,6 +84,7 @@ void bxcan_tx(uint16_t id, const uint8_t *data, uint8_t len) {
     CAN1->TXB[0].TDLR = dL;
     CAN1->TXB[0].TDHR = dH;
     CAN1->TXB[0].TIR |= CAN_TIR_TXRQ;
+    return 1;
 }
 
 int bxcan_rx(uint16_t *id_out, uint8_t *data_out, uint8_t *len_out) {

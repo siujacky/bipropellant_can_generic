@@ -66,7 +66,7 @@ void bxcan_app_enter_normal(void) {
     _enter_init(); CAN1->MCR &= ~(1U<<1); _leave_init();
 }
 void bxcan_app_enter_listen(void) {
-    _enter_init(); CAN1->BTR |= (1U<<30); _leave_init();
+    _enter_init(); CAN1->BTR |= (1U<<31); _leave_init();  /* SILM=bit31, not LBKM=bit30 */
 }
 
 int bxcan_app_tx(uint32_t id, const uint8_t *data, uint8_t len, int extended) {
@@ -98,10 +98,10 @@ int bxcan_app_rx(uint32_t *id_out, uint8_t *data_out, uint8_t *len_out, int *ext
     if (ext_out) *ext_out = ext;
     if (id_out)  *id_out  = ext ? (rir>>3)&0x1FFFFFFFU : (rir>>21)&0x7FFU;
     uint8_t n = CAN1->RXF[0].RDTR & 0xFU;
+    if (n > 8) n = 8;  /* clamp DLC before exposing to caller */
     if (len_out) *len_out = n;
     if (data_out && n) {
         uint32_t dL=CAN1->RXF[0].RDLR, dH=CAN1->RXF[0].RDHR;
-        if(n>8)n=8;
         for(uint8_t i=0;i<4&&i<n;i++) data_out[i]=(dL>>(i*8))&0xFF;
         for(uint8_t i=4;i<8&&i<n;i++) data_out[i]=(dH>>((i-4)*8))&0xFF;
     }
