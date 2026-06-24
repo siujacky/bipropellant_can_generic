@@ -413,7 +413,7 @@ static void handle_ctrl_cmd(const uint8_t *data, uint8_t len)
 
     case BL_CMD_CLEAR_NVRAM:
         flash_unlock();
-        flash_erase_region(APP_NVRAM_ADDR, APP_NVRAM_ADDR + 4096U);
+        flash_erase_region(APP_NVRAM_ADDR, APP_NVRAM_ADDR + 4096U - 1U);
         flash_lock();
         ctrl_respond(BL_CMD_CLEAR_NVRAM, BL_STATUS_OK, 0);
         delay_ms(200);
