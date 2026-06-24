@@ -13,6 +13,12 @@ Discarded input sections
  .text          0x00000000        0x0 usart_bl.o
  .data          0x00000000        0x0 usart_bl.o
  .bss           0x00000000        0x0 usart_bl.o
+ .text.usart_init_hdsel
+                0x00000000       0x50 usart_bl.o
+ .text.usart_init_autodetect
+                0x00000000       0xc4 usart_bl.o
+ .text.usart_tx_verify
+                0x00000000       0x68 usart_bl.o
  .text.usart_tx
                 0x00000000       0x24 usart_bl.o
  .text.usart_print_uint32
