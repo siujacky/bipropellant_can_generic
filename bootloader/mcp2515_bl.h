@@ -37,12 +37,25 @@
 #define MCP_CANINTF_RX0IF   0x01
 #define MCP_CANINTF_RX1IF   0x02
 
-/* TXB0 registers */
+/* TXB0 registers (address 0x30-0x36, bit4 HIGH — FAILS at 5V VCC)
+ * Use TXB1 instead when MCP2515 is powered at 5V with 3.3V SPI. */
 #define MCP_TXB0SIDL    0x32
 #define MCP_TXB0EID8    0x33
 #define MCP_TXB0EID0    0x34
 #define MCP_TXB0DLC     0x35
 #define MCP_TXB0D0      0x36
+
+/* TXB1 registers (address 0x40-0x4D, bit6 HIGH only — WORKS at 5V VCC)
+ * 5V fix: writes to 0x30 go to 0x20 (TEC, read-only) because bit4 fails.
+ * 0x40-0x4D only have bit6 HIGH which is confirmed to work at 5V. */
+#define MCP_TXB1CTRL    0x40
+#define MCP_TXB1SIDH    0x41
+#define MCP_TXB1SIDL    0x42
+#define MCP_TXB1EID8    0x43
+#define MCP_TXB1EID0    0x44
+#define MCP_TXB1DLC     0x45
+#define MCP_TXB1D0      0x46
+
 #define MCP_TXCTRL_TXREQ 0x04  /* bit 2 per DS21801J */
 
 /* RXB1 registers */
