@@ -165,9 +165,17 @@ static void enter_rom_dfu(void)
      * Select address by DevID: F4 uses 0x1FFF0000, F103 uses 0x1FFFF000. */
     uint16_t dev_id = (uint16_t)(DBGMCU_IDCODE & 0x0FFFU);
     uint32_t rom_base = ROM_BL_ADDR_F1;  /* default: STM32F103 */
-    if (dev_id == 0x0413U || dev_id == 0x0419U || dev_id == 0x0431U ||
-        dev_id == 0x0441U || dev_id == 0x0458U) {
-        rom_base = ROM_BL_ADDR_F4;       /* STM32F4xx family */
+    /* STM32F4xx family: ROM DFU at 0x1FFF0000 (AN2606 Table 2).
+     * F401: 0x0423 (xB/xC) / 0x0433 (xD/xE)
+     * F405/407: 0x0413   F42x/43x: 0x0419
+     * F411: 0x0431/0x0441   F412: 0x0441   F446: 0x0421   F469/479: 0x0434
+     * NOTE: these must be kept in sync with chip_detect.c's device table. */
+    if (dev_id == 0x0423U || dev_id == 0x0433U ||   /* F401xB/C, F401xD/E */
+        dev_id == 0x0413U || dev_id == 0x0419U ||   /* F405/407, F42x/43x */
+        dev_id == 0x0431U || dev_id == 0x0441U ||   /* F411xC/E, F412 */
+        dev_id == 0x0421U || dev_id == 0x0434U ||   /* F446, F469/479 */
+        dev_id == 0x0449U || dev_id == 0x0458U) {   /* F7xx */
+        rom_base = ROM_BL_ADDR_F4;       /* STM32F4xx/F7xx family */
     }
 
     uint32_t rom_sp = *(volatile uint32_t *)rom_base;

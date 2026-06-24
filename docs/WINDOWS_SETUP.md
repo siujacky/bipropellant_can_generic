@@ -138,30 +138,38 @@ python3 tools/detect_chip.py -d can0
 
 ---
 
-## STM32F411CEU6 — will this firmware work?
+## STM32F4xx (F401, F411) — will this firmware work?
 
-**Partially yes, with an important caveat:**
+**Partially yes, with one important caveat (same answer for F401 and F411).**
 
-| Feature | STM32F103RCT6 | STM32F411CEU6 | Works on F411? |
+| Chip | DevID | Flash | SRAM | Max MHz | TIM8? | Windows USB |
+|---|---|---|---|---|---|---|
+| STM32F401CCU6 (Black Pill v1) | 0x0423 | 256 KB | 64 KB | 84 | ❌ | Driver-free |
+| STM32F401CEU6 | 0x0433 | 512 KB | 96 KB | 84 | ❌ | Driver-free |
+| STM32F411CEU6 (Black Pill v2) | 0x0431 | 512 KB | 128 KB | 100 | ❌ | Driver-free |
+| STM32F103RCT6 (hoverboard) | 0x0414 | 256 KB | 48 KB | 72 | ✅ | Needs Zadig |
+
+| Feature | F103 | F401 / F411 | Works? |
 |---|---|---|---|
-| Bootloader (CAN+UART+USB DFU) | ✅ | ✅ | Yes — different ROM DFU addr (0x1FFF0000) |
-| chip_detect.c | ✅ | ✅ | Yes — DevID 0x0431/0x0441 added to table |
-| uart_hdsel.c | ✅ | ✅ | Yes — HAL-based, family-agnostic |
-| PhaseMap Wizard | ✅ | ✅ | Yes — GPIO/ADC logic is HAL-agnostic |
-| Single-motor drive (TIM1) | ✅ | ✅ | Yes — TIM1 complementary outputs on same pins |
-| **Dual-motor drive (TIM1+TIM8)** | ✅ | **❌** | **No — STM32F411 has no TIM8** |
+| Bootloader (CAN+UART+USB DFU) | ✅ | ✅ | Yes — ROM DFU at 0x1FFF0000 (DevID now in table) |
+| chip_detect.c | ✅ | ✅ | Yes — 0x0423/0x0433 (F401) + 0x0431 (F411) added |
+| uart_hdsel, PhaseMap, chip_detect | ✅ | ✅ | Yes — HAL-based, family-agnostic |
+| Single-motor drive (TIM1) | ✅ | ✅ | Yes — TIM1 pin mapping is **identical** on all three |
+| **Dual-motor drive (TIM1+TIM8)** | ✅ | **❌** | **No — F401/F411 have no TIM8** |
+| USB on Windows | Needs Zadig | **Driver-free** | F4 USB OTG = no driver install needed |
 
-**What this means for a hoverboard (dual-motor) controller:**
-- Right motor: TIM1 (PA8/PA9/PA10 + PB13/PB14/PB15) works identically on F411
-- Left motor: **no complementary timer** on F411 → use an external gate driver with
-  built-in dead-time, or run both motors from TIM1 channels 1-3 as a single-motor
-  controller
+**TIM1 pins are identical across F103, F401, F411:**
+```
+High-side: PA8(CH1)  PA9(CH2)  PA10(CH3)
+Low-side:  PB13(CH1N) PB14(CH2N) PB15(CH3N)
+```
+So the right-motor wiring from a hoverboard board drops straight in.
+Left motor needs external dead-time gate driver (F401/F411 have no TIM8 equivalent).
 
-**STM32F411 USB advantage:** The F411 has **USB OTG Full-Speed** which is driver-free
-on Windows 10/11 (CDC virtual COM port). No Zadig/CubeProgrammer needed for USB serial.
-The bootloader can enumerate as a COM port on Windows without any driver installation
-— a significant improvement over the F103.
+**F401 vs F411 for this project:**
+- Flash: F401CC = 256KB (same as F103), F411CE = 512KB
+- Both need F4 HAL (`stm32f4xx_hal`) not F1 HAL
+- Both enumerate USB as VID_0483:PID_DF11 in DFU mode (no driver needed)
 
-See `bootloader/hal_motor_stm32f4.c` for the single-advanced-timer motor stub
-(same architecture as GD32 single-motor support). To build for STM32F411, create
-a new Makefile env with `-DSTM32F411xE` + the F411 HAL + its startup/ld files.
+See `bootloader/hal_motor_stm32f4.c` for the single-motor stub. To build for F401/F411:
+create a Makefile env with `-DSTM32F401xC` or `-DSTM32F411xE` + F4 HAL + startup/ld.

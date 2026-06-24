@@ -39,7 +39,13 @@ DEVICE_IDS = {
     0x0430: ("STM32F103xF/G",    "XL-density",     96),
     0x0411: ("STM32F2xx",        "F2",             128),
     0x0413: ("STM32F405/F407",   "F4",             192),
+    0x0423: ("STM32F401xB/xC",   "F4",              64),  # Black Pill v1
+    0x0433: ("STM32F401xD/xE",   "F4",              96),
     0x0419: ("STM32F42x/F43x",   "F4",             256),
+    0x0421: ("STM32F446",        "F4",             128),
+    0x0431: ("STM32F411xC/xE",   "F4",             128),  # Black Pill v2
+    0x0434: ("STM32F469/F479",   "F4",             256),
+    0x0441: ("STM32F412",        "F4",             128),
     0x0449: ("STM32F7xx",        "F7",             256),
     # GD32
     0xA641: ("GD32F103 (medium)", "medium",         20),

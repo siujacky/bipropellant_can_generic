@@ -30,7 +30,11 @@ static const dev_entry_t k_devices[] = {
     { 0x0411, 20, "STM32F2xx",         "F2"     },
     { 0x0413, 192,"STM32F405/F407",    "F4"     },
     { 0x0419, 256,"STM32F42x/F43x",   "F4"     },
-    { 0x0431, 128,"STM32F411xC/xE (Black Pill)", "F4" },  /* 512KB max */
+    { 0x0423,  64,"STM32F401xB/xC",    "F4"     },  /* 256KB, 64KB SRAM, Black Pill v1 */
+    { 0x0433,  96,"STM32F401xD/xE",    "F4"     },  /* 384KB, 96KB SRAM */
+    { 0x0421, 128,"STM32F446",         "F4"     },
+    { 0x0431, 128,"STM32F411xC/xE",    "F4"     },  /* Black Pill v2 */
+    { 0x0434, 256,"STM32F469/F479",    "F4"     },
     { 0x0441, 128,"STM32F412",         "F4"     },
     { 0x0449, 256,"STM32F7xx",         "F7"     },
     /* GD32 (some share IDs with STM32 for drop-in compatibility) */
