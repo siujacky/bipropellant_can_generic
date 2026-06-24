@@ -1,8 +1,10 @@
 /* startup.s — Cortex-M3 minimal startup for Blue Pill CAN Tool.
- * STM32F103C6T6: 32KB flash (0x08000000), 10KB SRAM (0x20000000-0x20002800).
+ * STM32F103C6T6: 32KB flash, 10KB SRAM (0x20000000-0x20002800).
+ * App lives at 0x08002000 (after the 8KB CAN+UART bootloader).
  * Stack at top of 10KB SRAM = 0x20002800.
  * No HAL, no interrupts, no FPU.
- * Adapted from bootloader startup_bl.s — same structure, adjusted stack address.
+ * SCB->VTOR is set to 0x08002000 so the NVIC uses this app's vector table
+ * (required when jumped to from the bootloader at 0x08000000).
  */
 
     .syntax unified
@@ -52,6 +54,16 @@ _vectors:
 Reset_Handler:
     /* Disable all interrupts at core level */
     cpsid  i
+
+    /* Relocate the vector table to our actual start address (0x08002000).
+     * SCB->VTOR is at 0xE000ED08. The bootloader sets it to 0x08000000
+     * before jumping here; we must update it so the NVIC dispatches to
+     * our handlers, not the bootloader's (now-invalid) vector table.
+     * This is safe to do before RAM init since it only writes to a
+     * Cortex-M3 System Control Block register. */
+    ldr    r0, =0xE000ED08          @ SCB_VTOR
+    ldr    r1, =0x08002000          @ our app base
+    str    r1, [r0]
 
     /* Zero .bss section in RAM */
     ldr    r0, =_sbss

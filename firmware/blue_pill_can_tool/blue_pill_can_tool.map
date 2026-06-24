@@ -34,7 +34,7 @@ Discarded input sections
 Memory Configuration
 
 Name             Origin             Length             Attributes
-FLASH            0x08000000         0x00008000         xr
+FLASH            0x08002000         0x00006000         xr
 RAM              0x20000000         0x00002800         xrw
 *default*        0x00000000         0xffffffff
 
@@ -47,133 +47,133 @@ LOAD usart.o
 LOAD slcan.o
                 0x20002800                        _estack = (ORIGIN (RAM) + LENGTH (RAM))
 
-.text           0x08000000     0x2284
+.text           0x08002000     0x2294
  *(.isr_vector)
- .isr_vector    0x08000000       0x40 startup.o
-                0x08000000                _vectors
+ .isr_vector    0x08002000       0x40 startup.o
+                0x08002000                _vectors
  *(.text)
  *(.text.*)
  .text.Reset_Handler
-                0x08000040       0x40 startup.o
-                0x08000040                Reset_Handler
+                0x08002040       0x50 startup.o
+                0x08002040                Reset_Handler
  .text.print_uint32
-                0x08000080       0x50 main.o
+                0x08002090       0x50 main.o
  .text.startup.main
-                0x080000d0      0x58c main.o
-                0x080000d0                main
+                0x080020e0      0x58c main.o
+                0x080020e0                main
  .text.gpio_spi_init
-                0x0800065c       0x70 mcp2515.o
+                0x0800266c       0x70 mcp2515.o
  .text.mcp_write_reg
-                0x080006cc       0x74 mcp2515.o
+                0x080026dc       0x74 mcp2515.o
  .text.mcp2515_release_pins
-                0x08000740       0x40 mcp2515.o
-                0x08000740                mcp2515_release_pins
+                0x08002750       0x40 mcp2515.o
+                0x08002750                mcp2515_release_pins
  .text.mcp2515_restore_pins
-                0x08000780        0x4 mcp2515.o
-                0x08000780                mcp2515_restore_pins
+                0x08002790        0x4 mcp2515.o
+                0x08002790                mcp2515_restore_pins
  .text.mcp2515_set_bitrate
-                0x08000784      0x218 mcp2515.o
-                0x08000784                mcp2515_set_bitrate
+                0x08002794      0x218 mcp2515.o
+                0x08002794                mcp2515_set_bitrate
  .text.mcp2515_init
-                0x0800099c      0x18c mcp2515.o
-                0x0800099c                mcp2515_init
+                0x080029ac      0x18c mcp2515.o
+                0x080029ac                mcp2515_init
  .text.mcp2515_enter_normal
-                0x08000b28      0x110 mcp2515.o
-                0x08000b28                mcp2515_enter_normal
+                0x08002b38      0x110 mcp2515.o
+                0x08002b38                mcp2515_enter_normal
  .text.mcp2515_enter_listen_only
-                0x08000c38       0x88 mcp2515.o
-                0x08000c38                mcp2515_enter_listen_only
+                0x08002c48       0x88 mcp2515.o
+                0x08002c48                mcp2515_enter_listen_only
  .text.mcp2515_tx
-                0x08000cc0      0x2c0 mcp2515.o
-                0x08000cc0                mcp2515_tx
+                0x08002cd0      0x2c0 mcp2515.o
+                0x08002cd0                mcp2515_tx
  .text.mcp2515_tx_rtr
-                0x08000f80      0x1a4 mcp2515.o
-                0x08000f80                mcp2515_tx_rtr
+                0x08002f90      0x1a4 mcp2515.o
+                0x08002f90                mcp2515_tx_rtr
  .text.mcp2515_rx_available
-                0x08001124       0x7c mcp2515.o
-                0x08001124                mcp2515_rx_available
+                0x08003134       0x7c mcp2515.o
+                0x08003134                mcp2515_rx_available
  .text.mcp2515_rx
-                0x080011a0      0x4e0 mcp2515.o
-                0x080011a0                mcp2515_rx
+                0x080031b0      0x4e0 mcp2515.o
+                0x080031b0                mcp2515_rx
  .text.mcp2515_read_errors
-                0x08001680      0x100 mcp2515.o
-                0x08001680                mcp2515_read_errors
+                0x08003690      0x100 mcp2515.o
+                0x08003690                mcp2515_read_errors
  .text.usart1_init
-                0x08001780       0x80 usart.o
-                0x08001780                usart1_init
+                0x08003790       0x80 usart.o
+                0x08003790                usart1_init
  .text.usart1_tx_byte
-                0x08001800       0x14 usart.o
-                0x08001800                usart1_tx_byte
+                0x08003810       0x14 usart.o
+                0x08003810                usart1_tx_byte
  .text.usart1_print
-                0x08001814       0x20 usart.o
-                0x08001814                usart1_print
+                0x08003824       0x20 usart.o
+                0x08003824                usart1_print
  .text.usart1_getchar_nb
-                0x08001834       0x1c usart.o
-                0x08001834                usart1_getchar_nb
+                0x08003844       0x1c usart.o
+                0x08003844                usart1_getchar_nb
  .text.usart3_hdsel_init
-                0x08001850       0x90 usart.o
-                0x08001850                usart3_hdsel_init
+                0x08003860       0x90 usart.o
+                0x08003860                usart3_hdsel_init
  .text.usart3_deinit
-                0x080018e0       0x28 usart.o
-                0x080018e0                usart3_deinit
+                0x080038f0       0x28 usart.o
+                0x080038f0                usart3_deinit
  .text.usart3_tx_byte
-                0x08001908       0x20 usart.o
-                0x08001908                usart3_tx_byte
+                0x08003918       0x20 usart.o
+                0x08003918                usart3_tx_byte
  .text.usart3_getchar_nb
-                0x08001928       0x28 usart.o
-                0x08001928                usart3_getchar_nb
+                0x08003938       0x28 usart.o
+                0x08003938                usart3_getchar_nb
  .text.usart3_rx_byte_timeout
-                0x08001950       0x54 usart.o
-                0x08001950                usart3_rx_byte_timeout
+                0x08003960       0x54 usart.o
+                0x08003960                usart3_rx_byte_timeout
  .text.nibble_to_hex
-                0x080019a4       0x10 slcan.o
-                0x080019a4                nibble_to_hex
+                0x080039b4       0x10 slcan.o
+                0x080039b4                nibble_to_hex
  .text.parse_hex_u32
-                0x080019b4       0x58 slcan.o
-                0x080019b4                parse_hex_u32
+                0x080039c4       0x58 slcan.o
+                0x080039c4                parse_hex_u32
  .text.slcan_format_rx
-                0x08001a0c      0x134 slcan.o
-                0x08001a0c                slcan_format_rx
+                0x08003a1c      0x134 slcan.o
+                0x08003a1c                slcan_format_rx
  .text.slcan_parse_cmd
-                0x08001b40      0x268 slcan.o
-                0x08001b40                slcan_parse_cmd
+                0x08003b50      0x268 slcan.o
+                0x08003b50                slcan_parse_cmd
  *(.rodata)
  *(.rodata.*)
  .rodata.main.str1.4
-                0x08001da8      0x4b5 main.o
+                0x08003db8      0x4b5 main.o
                                 0x47e (size before relaxing)
  .rodata.str1.4
-                0x0800225d       0x23 main.o
- *fill*         0x0800225d        0x3 
+                0x0800426d       0x23 main.o
+ *fill*         0x0800426d        0x3 
  .rodata.CSWTCH.44
-                0x08002260       0x14 main.o
+                0x08004270       0x14 main.o
  .rodata.bitrate_table
-                0x08002274        0xf mcp2515.o
+                0x08004284        0xf mcp2515.o
  .rodata.slcan_parse_cmd.str1.4
-                0x08002283       0x11 slcan.o
-                0x08002294                        . = ALIGN (0x4)
- *fill*         0x08002283        0x1 
-                0x08002284                        _etext = .
+                0x08004293       0x11 slcan.o
+                0x080042a4                        . = ALIGN (0x4)
+ *fill*         0x08004293        0x1 
+                0x08004294                        _etext = .
 
-.glue_7         0x08002284        0x0
- .glue_7        0x08002284        0x0 linker stubs
+.glue_7         0x08004294        0x0
+ .glue_7        0x08004294        0x0 linker stubs
 
-.glue_7t        0x08002284        0x0
- .glue_7t       0x08002284        0x0 linker stubs
+.glue_7t        0x08004294        0x0
+ .glue_7t       0x08004294        0x0 linker stubs
 
-.vfp11_veneer   0x08002284        0x0
- .vfp11_veneer  0x08002284        0x0 linker stubs
+.vfp11_veneer   0x08004294        0x0
+ .vfp11_veneer  0x08004294        0x0 linker stubs
 
-.v4_bx          0x08002284        0x0
- .v4_bx         0x08002284        0x0 linker stubs
+.v4_bx          0x08004294        0x0
+ .v4_bx         0x08004294        0x0 linker stubs
 
-.iplt           0x08002284        0x0
- .iplt          0x08002284        0x0 startup.o
+.iplt           0x08004294        0x0
+ .iplt          0x08004294        0x0 startup.o
 
-.rel.dyn        0x08002284        0x0
- .rel.iplt      0x08002284        0x0 startup.o
+.rel.dyn        0x08004294        0x0
+ .rel.iplt      0x08004294        0x0 startup.o
 
-.data           0x20000000        0x4 load address 0x08002284
+.data           0x20000000        0x4 load address 0x08004294
                 0x20000000                        _sdata = .
  *(.data)
  *(.data.*)
@@ -181,12 +181,12 @@ LOAD slcan.o
                 0x20000004                        . = ALIGN (0x4)
  *fill*         0x20000001        0x3 
                 0x20000004                        _edata = .
-                0x08002284                        _ldata = LOADADDR (.data)
+                0x08004294                        _ldata = LOADADDR (.data)
 
-.igot.plt       0x20000004        0x0 load address 0x08002288
+.igot.plt       0x20000004        0x0 load address 0x08004298
  .igot.plt      0x20000004        0x0 startup.o
 
-.bss            0x20000004       0x44 load address 0x08002288
+.bss            0x20000004       0x44 load address 0x08004298
                 0x20000004                        _sbss = .
  *(.bss)
  *(.bss.*)

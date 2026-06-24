@@ -1,14 +1,17 @@
-/* linker.ld — STM32F103C6T6 (32KB flash, 10KB SRAM).
- * Conservative layout fits both C6T6 (32KB/10KB) and C8T6 (64KB/20KB).
+/* linker.ld — STM32F103C6T6 with CAN+UART bootloader.
  *
- * Flash: 0x08000000 - 0x08007FFF (32KB)
- * RAM:   0x20000000 - 0x200027FF (10KB = 0x2800 bytes)
- * Stack: grows down from 0x20002800 (top of 10KB RAM).
+ * Flash layout:
+ *   0x08000000 - 0x08001FFF  8 KB  Bootloader (bootloader/bootloader.bin)
+ *   0x08002000 - 0x08007FFF 24 KB  This application (Slot A)
+ * RAM:   0x20000000 - 0x200027FF (10KB)
+ * Stack: grows down from 0x20002800.
+ *
+ * Total used: 6 KB (bootloader) + 8.8 KB (app) = 14.8 KB of 32 KB.
  */
 
 MEMORY
 {
-    FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 32K
+    FLASH (rx)  : ORIGIN = 0x08002000, LENGTH = 24K
     RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 10K
 }
 
