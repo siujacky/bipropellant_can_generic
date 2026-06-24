@@ -349,18 +349,20 @@ def _crc32_bl(data: bytes) -> int:
 # Firmware upload (bipropellant_can_generic 0x7DD upload protocol)
 # ---------------------------------------------------------------------------
 
-def flash_firmware(bus, data: bytes, uid2: int) -> bool:
+def flash_firmware(bus, data: bytes, uid0: int) -> bool:
     """
     Upload firmware binary using the bipropellant_can_generic CAN protocol.
 
-    Protocol recap (matching main_bl.c can_upload()):
-      1. Host sends uid2 (DESIG_UNIQUE_ID2, 4 bytes LE) on 0x7DD.
+    Protocol (matching main_bl.c can_upload()):
+      1. Host sends uid0 (DESIG_UNIQUE_ID0, 4 bytes LE) on 0x7DD.
+         Bootloader compares against DESIG_UNIQUE_ID0 (not UID2 — fixed).
       2. BL replies with byte 'S' on CAN_TX_ID (0x7DE).
       3. Host sends n_pages (4 bytes LE) on 0x7DD.
-      4. For each page: host sends 128 frames of 8 bytes on 0x7DD.
-           Frames 0..126: 8 bytes of page data.
-           Frame 127:     bytes [1016..1019] of page (4 bytes) + CRC32 (4 bytes LE).
-         BL replies 'P' on 0x7DE (page OK) or 'E' (CRC error, retry).
+      4. For each page: 129 frames total on 0x7DD:
+           Frames 0..127: 8 bytes each = 1024 bytes (full page).
+           Frame 128:     CRC32 LE (4 bytes) + 4 bytes padding.
+           CRC computed over all 1024 bytes (not 1020 — fixed).
+         BL replies 'P' (page OK) or 'E' (CRC error, retry) or 'D' (last page done).
       5. After all pages: BL sends 'D' and jumps.
 
     Returns True on success.
@@ -371,13 +373,13 @@ def flash_firmware(bus, data: bytes, uid2: int) -> bool:
     n_pages = len(data) // FLASH_PAGE_SIZE
     print(f"Firmware: {len(data)} bytes  ({n_pages} pages of {FLASH_PAGE_SIZE} B)")
 
-    # Step 1: send upload trigger (uid2)
+    # Step 1: send upload trigger (uid0 — bootloader matches UID0 from hello frame)
     bus.send(can.Message(
         arbitration_id=BL_DATA_ID,
-        data=struct.pack("<I", uid2),
+        data=struct.pack("<I", uid0),
         is_extended_id=False,
     ))
-    print(f"  Sent upload trigger (UID2=0x{uid2:08X}) on 0x{BL_DATA_ID:03X}")
+    print(f"  Sent upload trigger (UID0=0x{uid0:08X}) on 0x{BL_DATA_ID:03X}")
 
     # Step 2: wait for 'S'
     print("  Waiting for 'S' (ready) from bootloader ...")
@@ -401,16 +403,15 @@ def flash_firmware(bus, data: bytes, uid2: int) -> bool:
         is_extended_id=False,
     ))
 
-    # Step 4: send pages
+    # Step 4: send pages — 128 data frames + 1 CRC frame = 129 total per page
     for page_idx in range(n_pages):
-        page_data    = data[page_idx * FLASH_PAGE_SIZE:(page_idx + 1) * FLASH_PAGE_SIZE]
-        payload_1020 = page_data[:1020]
-        crc          = _crc32_bl(payload_1020)
+        page_data = data[page_idx * FLASH_PAGE_SIZE:(page_idx + 1) * FLASH_PAGE_SIZE]
+        crc       = _crc32_bl(page_data)   # CRC over full 1024 bytes (was 1020 — fixed)
 
         for attempt in range(8):
-            # Frames 0..126: 8 bytes each = 1016 bytes
-            for f in range(127):
-                chunk = payload_1020[f * 8:(f + 1) * 8]
+            # Frames 0..127: 8 bytes each = 1024 bytes (full page)
+            for f in range(128):
+                chunk = page_data[f * 8:(f + 1) * 8]
                 bus.send(can.Message(
                     arbitration_id=BL_DATA_ID,
                     data=chunk,
@@ -418,11 +419,10 @@ def flash_firmware(bus, data: bytes, uid2: int) -> bool:
                 ))
                 time.sleep(0.0002)   # 200 µs inter-chunk gap
 
-            # Frame 127: last 4 data bytes + CRC32 LE
-            last_frame = payload_1020[1016:1020] + struct.pack("<I", crc)
+            # Frame 128: CRC32 LE (4 bytes) + 4 bytes padding
             bus.send(can.Message(
                 arbitration_id=BL_DATA_ID,
-                data=last_frame,
+                data=struct.pack("<I", crc) + b"\x00\x00\x00\x00",
                 is_extended_id=False,
             ))
 
@@ -535,11 +535,10 @@ Examples:
     bus = can.interface.Bus(channel=args.device, bustype="socketcan")
     try:
         # Discover bootloader — prints the banner automatically (startup broadcast)
-        _uid0, uid2_from_bl, uid0_auth = discover_bootloader(bus, timeout=3.0)
+        uid0_from_bl, uid2_from_bl, uid0_auth = discover_bootloader(bus, timeout=3.0)
 
-        # uid2 for the upload trigger: prefer explicit -i flag, else use value
-        # extracted from the STATUS banner frames (uid2 = DESIG_UNIQUE_ID2)
-        uid2 = uid2_override if uid2_override is not None else uid2_from_bl
+        # uid0 for the upload trigger — bootloader matches DESIG_UNIQUE_ID0 (not UID2)
+        uid0_trigger = uid0_from_bl
 
         # ---- Control-only commands ----------------------------------------
         if args.status:
@@ -585,7 +584,7 @@ Examples:
         # else: default Slot A — no control command needed (bootloader default)
 
         # Proceed with standard upload protocol (0x7DD)
-        ok = flash_firmware(bus, firmware, uid2=uid2)
+        ok = flash_firmware(bus, firmware, uid0=uid0_trigger)
 
         if ok:
             print("Flash complete. Board is booting.")

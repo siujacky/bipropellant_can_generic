@@ -231,8 +231,9 @@ int mcp2515_enter_normal(void)
 int mcp2515_enter_listen_only(void)
 {
     mcp_write_reg(MCP_CANCTRL, MCP_MODE_LISTEN_ONLY);
-    delay_ms(1);
-    return 0;
+    delay_ms(2);
+    uint8_t stat = mcp_read_reg(MCP_CANSTAT);
+    return ((stat & MCP_MODE_MASK) == MCP_MODE_LISTEN_ONLY) ? 0 : -1;
 }
 
 /* -----------------------------------------------------------------------
@@ -322,6 +323,10 @@ int mcp2515_tx_rtr(uint32_t id, uint8_t dlc, int extended)
 
     timeout = 50000;
     while ((mcp_read_reg(MCP_TXB0CTRL) & MCP_TXCTRL_TXREQ) && --timeout);
+    /* Check error flags (ABTF|MLOA|TXERR) — same as mcp2515_tx() */
+    uint8_t txctrl = mcp_read_reg(MCP_TXB0CTRL);
+    if (txctrl & (MCP_TXCTRL_ABTF | MCP_TXCTRL_MLOA | MCP_TXCTRL_TXERR))
+        return -1;
     return timeout ? 0 : -1;
 }
 

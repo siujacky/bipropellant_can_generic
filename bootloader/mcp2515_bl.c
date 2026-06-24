@@ -137,7 +137,7 @@ void mcp2515_init(void) {
         delay_ms(1);
 
         /* Clear stale TXREQ in TXB1 by writing 0x00 (all LOW bits — always works
-         * at 5V since no HIGH bits needed). ABAT (bit4=0x10) doesn't work at 5V.
+         * at 5V since no HIGH bits needed). ABAT via CANCTRL.bit4 did not clear TXB1 at 5V (root cause unclear; direct write of 0x00 attempted instead).
          * Writing 0x00 to addr 0x40 (bit6 only) clears TXREQ and priority. */
         mcp_write_reg(MCP_TXB1CTRL, 0x00U);
         delay_ms(2);

@@ -244,13 +244,16 @@ def upload_firmware(s: serial.Serial, firmware: bytes, uid0: int) -> bool:
             if ack == 'P':
                 break
             elif ack == 'D':
-                # Bootloader sent 'D' instead of 'P' for the last page —
-                # this is valid: the bootloader may combine the final 'P' and
-                # 'D' into just 'D'.  The 'D' has been consumed here so we
-                # must NOT wait for another 'D' below.
-                print()
-                print("  Bootloader sent 'D' — firmware written, Blue Pill rebooting.")
-                return True
+                # 'D' is only valid on the LAST page (bootloader sends D after
+                # writing the final page instead of P+D separately).  On any
+                # earlier page a 'D' means a stale frame or protocol error.
+                if page_idx == n_pages - 1:
+                    print()
+                    print("  Bootloader sent 'D' — firmware written, Blue Pill rebooting.")
+                    return True
+                else:
+                    print(f"  ERROR: got 'D' on non-final page {page_idx} — aborting.")
+                    return False
             elif ack == 'E':
                 print(f"  Page {page_idx} CRC error, retry {attempt+1}/8 ...")
             else:
