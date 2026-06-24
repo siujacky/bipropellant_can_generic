@@ -39,11 +39,13 @@ _Min_Heap_Size = 0x200;      /* required amount of heap  */
 _Min_Stack_Size = 0x400; /* required amount of stack */
 _Reserved_Space = 0x800;
 /* Specify the memory areas */
+/* Memory layout with CAN bootloader at 0x08000000..0x08001FFF (8KB),
+ * application at 0x08002000..0x0803FFFF (250KB minus reserved space). */
 MEMORY
 {
 RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 48K
-FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 256K - _Reserved_Space
-RESERVED_FLASH (rw) : ORIGIN = 0x8000000 + 256K - _Reserved_Space, LENGTH = _Reserved_Space
+FLASH (rx)      : ORIGIN = 0x08002000, LENGTH = 250K - _Reserved_Space
+RESERVED_FLASH (rw) : ORIGIN = 0x08002000 + 250K - _Reserved_Space, LENGTH = _Reserved_Space
 }
 
 /* Define output sections */

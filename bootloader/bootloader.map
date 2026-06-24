@@ -1,0 +1,165 @@
+
+Discarded input sections
+
+ .text          0x00000000        0x0 startup_bl.o
+ .data          0x00000000        0x0 startup_bl.o
+ .bss           0x00000000        0x0 startup_bl.o
+ .text          0x00000000        0x0 mcp2515_bl.o
+ .data          0x00000000        0x0 mcp2515_bl.o
+ .bss           0x00000000        0x0 mcp2515_bl.o
+ .text.mcp2515_rx_available
+                0x00000000       0x2c mcp2515_bl.o
+ .comment       0x00000000       0x27 mcp2515_bl.o
+ .text          0x00000000        0x0 usart_bl.o
+ .data          0x00000000        0x0 usart_bl.o
+ .bss           0x00000000        0x0 usart_bl.o
+ .text.usart_tx
+                0x00000000       0x24 usart_bl.o
+ .comment       0x00000000       0x27 usart_bl.o
+ .text          0x00000000        0x0 flash_bl.o
+ .data          0x00000000        0x0 flash_bl.o
+ .bss           0x00000000        0x0 flash_bl.o
+ .text.flash_erase_page
+                0x00000000       0x10 flash_bl.o
+ .text.flash_write_halfword
+                0x00000000       0x2c flash_bl.o
+ .comment       0x00000000       0x27 flash_bl.o
+ .text          0x00000000        0x0 main_bl.o
+ .data          0x00000000        0x0 main_bl.o
+ .bss           0x00000000        0x0 main_bl.o
+ .comment       0x00000000       0x27 main_bl.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+FLASH            0x08000000         0x00002000         xr
+RAM              0x20000000         0x00001000         xrw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD startup_bl.o
+LOAD mcp2515_bl.o
+LOAD usart_bl.o
+LOAD flash_bl.o
+LOAD main_bl.o
+                0x20001000                        _estack = (ORIGIN (RAM) + LENGTH (RAM))
+
+.text           0x08000000      0x8e0
+ *(.isr_vector)
+ .isr_vector    0x08000000       0x40 startup_bl.o
+ *(.text)
+ *(.text.*)
+ .text.Reset_Handler
+                0x08000040       0x40 startup_bl.o
+                0x08000040                Reset_Handler
+ .text.spi_xfer
+                0x08000080       0x70 mcp2515_bl.o
+ .text.mcp2515_init
+                0x080000f0      0x138 mcp2515_bl.o
+                0x080000f0                mcp2515_init
+ .text.mcp2515_tx
+                0x08000228       0xec mcp2515_bl.o
+                0x08000228                mcp2515_tx
+ .text.mcp2515_rx
+                0x08000314      0x110 mcp2515_bl.o
+                0x08000314                mcp2515_rx
+ .text.usart_init
+                0x08000424       0x50 usart_bl.o
+                0x08000424                usart_init
+ .text.usart_rx_ready
+                0x08000474       0x10 usart_bl.o
+                0x08000474                usart_rx_ready
+ .text.usart_rx_byte
+                0x08000484       0x18 usart_bl.o
+                0x08000484                usart_rx_byte
+ .text.usart_tx_byte
+                0x0800049c       0x14 usart_bl.o
+                0x0800049c                usart_tx_byte
+ .text.usart_rx_buf
+                0x080004b0       0x50 usart_bl.o
+                0x080004b0                usart_rx_buf
+ .text.flash_erase_page.part.0
+                0x08000500       0x30 flash_bl.o
+ .text.flash_unlock
+                0x08000530       0x20 flash_bl.o
+                0x08000530                flash_unlock
+ .text.flash_lock
+                0x08000550       0x10 flash_bl.o
+                0x08000550                flash_lock
+ .text.flash_write_page
+                0x08000560       0xb8 flash_bl.o
+                0x08000560                flash_write_page
+ .text.jump_to_app
+                0x08000618       0x2c main_bl.o
+ .text.send_byte
+                0x08000644       0x2c main_bl.o
+ .text.startup.main
+                0x08000670      0x270 main_bl.o
+                0x08000670                main
+ *(.rodata)
+ *(.rodata.*)
+                0x080008e0                        . = ALIGN (0x4)
+                0x080008e0                        _etext = .
+
+.glue_7         0x080008e0        0x0
+ .glue_7        0x080008e0        0x0 linker stubs
+
+.glue_7t        0x080008e0        0x0
+ .glue_7t       0x080008e0        0x0 linker stubs
+
+.vfp11_veneer   0x080008e0        0x0
+ .vfp11_veneer  0x080008e0        0x0 linker stubs
+
+.v4_bx          0x080008e0        0x0
+ .v4_bx         0x080008e0        0x0 linker stubs
+
+.iplt           0x080008e0        0x0
+ .iplt          0x080008e0        0x0 startup_bl.o
+
+.rel.dyn        0x080008e0        0x0
+ .rel.iplt      0x080008e0        0x0 startup_bl.o
+
+.data           0x20000000        0x0 load address 0x080008e0
+                0x20000000                        _sdata = .
+ *(.data)
+ *(.data.*)
+                0x20000000                        . = ALIGN (0x4)
+                0x20000000                        _edata = .
+                0x080008e0                        _ldata = LOADADDR (.data)
+
+.igot.plt       0x20000000        0x0 load address 0x080008e0
+ .igot.plt      0x20000000        0x0 startup_bl.o
+
+.bss            0x20000000      0x404 load address 0x080008e0
+                0x20000000                        _sbss = .
+ *(.bss)
+ *(.bss.*)
+ .bss.page_buf  0x20000000      0x400 main_bl.o
+ .bss.g_transport
+                0x20000400        0x1 main_bl.o
+ *(COMMON)
+                0x20000404                        . = ALIGN (0x4)
+ *fill*         0x20000401        0x3 
+                0x20000404                        _ebss = .
+
+/DISCARD/
+ *(.ARM.exidx*)
+ *(.ARM.extab*)
+ *(.eh_frame*)
+ *(.comment)
+OUTPUT(bootloader.elf elf32-littlearm)
+LOAD linker stubs
+
+.ARM.attributes
+                0x00000000       0x2f
+ .ARM.attributes
+                0x00000000       0x21 startup_bl.o
+ .ARM.attributes
+                0x00000021       0x2d mcp2515_bl.o
+ .ARM.attributes
+                0x0000004e       0x2d usart_bl.o
+ .ARM.attributes
+                0x0000007b       0x2d flash_bl.o
+ .ARM.attributes
+                0x000000a8       0x2d main_bl.o
