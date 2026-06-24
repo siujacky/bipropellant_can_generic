@@ -100,7 +100,7 @@ def _read_until_cr(s: serial.Serial, timeout: float) -> bytes:
     buf = b''
     while time.monotonic() < deadline:
         remaining = deadline - time.monotonic()
-        s.timeout = min(remaining + 0.01, 0.1)
+        s.timeout = max(0.0, min(remaining + 0.01, 0.1))
         ch = s.read(1)
         if not ch:
             continue
@@ -183,6 +183,11 @@ def wait_for_hello(s: serial.Serial, timeout: float = 35.0) -> tuple:
 # ---------------------------------------------------------------------------
 
 def upload_firmware(s: serial.Serial, firmware: bytes, uid0: int) -> bool:
+    # Flush OS serial buffer: a stale 'D' or 't7DE...' from a prior session
+    # sitting in the OS FIFO would trigger the elif ack=='D' early-exit on
+    # page 0, falsely reporting success without flashing anything.
+    s.reset_input_buffer()
+
     pad = (-len(firmware)) % FLASH_PAGE
     firmware += b'\xff' * pad
     n_pages = len(firmware) // FLASH_PAGE
@@ -193,9 +198,9 @@ def upload_firmware(s: serial.Serial, firmware: bytes, uid0: int) -> bool:
     slcan_send(s, BL_DATA_ID, struct.pack('<I', uid0))
     time.sleep(0.1)
 
-    # Wait for 'S' (ready)
+    # Wait for 'S' (ready) — 8 s gives margin for CAN jitter within 30 s BKP window
     print("  Waiting for 'S' (ready) ...")
-    deadline = time.monotonic() + 3.0
+    deadline = time.monotonic() + 8.0
     ready = False
     while time.monotonic() < deadline:
         can_id, data = slcan_recv_frame(s, timeout=0.2)

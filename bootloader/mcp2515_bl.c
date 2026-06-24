@@ -160,10 +160,19 @@ void mcp2515_init(void) {
         CS_LOW(); spi_xfer(MCP_BIT_MODIFY); spi_xfer(MCP_CANINTF);
         spi_xfer(0x03U); spi_xfer(0x00U); CS_HIGH();
     }
-    /* Restore NORMAL + OSM */
+    /* Restore NORMAL + OSM (same retry loop as init — OSM bit 3 may need retries) */
     mcp_write_reg(MCP_CANCTRL, MCP_MODE_NORMAL);
     delay_ms(2);
-    mcp_write_reg(MCP_CANCTRL, 0x08U);
+    {
+        uint8_t rb;
+        for (int try = 0; try < 5; try++) {
+            mcp_write_reg(MCP_CANCTRL, 0x08U);
+            delay_ms(1);
+            rb = mcp_read_reg(MCP_CANCTRL);
+            if ((rb & 0x08U) == 0x08U) break;
+        }
+        g_bl_canctrl = mcp_read_reg(MCP_CANCTRL);  /* update post-restore canctrl */
+    }
 }
 
 volatile uint8_t g_bl_canstat;
