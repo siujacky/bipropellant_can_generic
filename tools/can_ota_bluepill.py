@@ -238,10 +238,18 @@ def upload_firmware(s: serial.Serial, firmware: bytes, uid0: int) -> bool:
 
             if ack == 'P':
                 break
+            elif ack == 'D':
+                # Bootloader sent 'D' instead of 'P' for the last page —
+                # this is valid: the bootloader may combine the final 'P' and
+                # 'D' into just 'D'.  The 'D' has been consumed here so we
+                # must NOT wait for another 'D' below.
+                print()
+                print("  Bootloader sent 'D' — firmware written, Blue Pill rebooting.")
+                return True
             elif ack == 'E':
                 print(f"  Page {page_idx} CRC error, retry {attempt+1}/8 ...")
             else:
-                print(f"  Timeout on page {page_idx} ACK")
+                print(f"  Timeout on page {page_idx} ACK (got {ack!r})")
                 return False
         else:
             print(f"  Page {page_idx} failed after 8 retries")
@@ -252,14 +260,14 @@ def upload_firmware(s: serial.Serial, firmware: bytes, uid0: int) -> bool:
 
     print()
 
-    # Wait for 'D' (done)
+    # Wait for 'D' (done) — only reached if no page sent 'D' above
     deadline = time.monotonic() + 3.0
     while time.monotonic() < deadline:
         can_id, data = slcan_recv_frame(s, timeout=0.2)
         if can_id == BL_HELLO_ID and data and data[0] == ord('D'):
             print("  Bootloader sent 'D' — firmware written, Blue Pill rebooting.")
             return True
-    print("  WARNING: no 'D' received, but pages completed.")
+    print("  WARNING: no 'D' received, but all pages passed CRC.")
     return True
 
 
