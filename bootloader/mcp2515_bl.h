@@ -65,3 +65,4 @@ extern volatile uint8_t g_bl_canctrl;
 extern volatile uint8_t g_bl_txb0ctrl;
 
 #endif /* MCP2515_BL_H */
+extern volatile uint8_t g_bl_loopback;

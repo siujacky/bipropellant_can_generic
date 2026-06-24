@@ -95,10 +95,46 @@ void mcp2515_init(void) {
     }
     g_bl_canstat = mcp_read_reg(MCP_CANSTAT);
     g_bl_canctrl = canctrl_rb;
+
+    /* ---------------------------------------------------------------
+     * Internal LOOPBACK self-test (no CANH/CANL wires needed).
+     * Put MCP2515 into LOOPBACK mode, transmit one frame, verify it
+     * is received internally.  Result in g_bl_loopback:
+     *   0xAA = test not run (init fail)
+     *   0x01 = LOOPBACK TX+RX OK   → SPI and MCP2515 logic work ✓
+     *   0x00 = LOOPBACK TX failed  → SPI write of TXREQ is broken ✗
+     * After the test the chip is restored to NORMAL mode.
+     * --------------------------------------------------------------- */
+    g_bl_loopback = 0xAAU;
+    mcp_write_reg(MCP_CANCTRL, 0x40U);   /* LOOPBACK mode */
+    delay_ms(2);
+    if ((mcp_read_reg(MCP_CANSTAT) & 0xE0U) == 0x40U) {
+        /* Load a test frame into TXB0 */
+        mcp_write_reg(MCP_TXB0SIDH, 0x55U);
+        mcp_write_reg(MCP_TXB0SIDL, 0x00U);
+        mcp_write_reg(MCP_TXB0EID8, 0x00U);
+        mcp_write_reg(MCP_TXB0EID0, 0x00U);
+        mcp_write_reg(MCP_TXB0DLC,  0x01U);
+        mcp_write_reg(MCP_TXB0D0,   0xA5U);
+        /* Trigger TX via register write (WRITE=0x02, MSB=0 — reliable at 5V) */
+        mcp_write_reg(MCP_TXB0CTRL, MCP_TXCTRL_TXREQ);
+        /* Wait for internal RX (loopback delivers within ~1µs at 250kbps) */
+        uint32_t poll = 10000;
+        while (poll-- && !(mcp_read_reg(MCP_CANINTF) & MCP_CANINTF_RX0IF));
+        g_bl_loopback = (mcp_read_reg(MCP_CANINTF) & MCP_CANINTF_RX0IF) ? 1U : 0U;
+        /* Clear RX flag */
+        CS_LOW(); spi_xfer(MCP_BIT_MODIFY); spi_xfer(MCP_CANINTF);
+        spi_xfer(MCP_CANINTF_RX0IF); spi_xfer(0x00U); CS_HIGH();
+    }
+    /* Restore NORMAL + OSM */
+    mcp_write_reg(MCP_CANCTRL, MCP_MODE_NORMAL);
+    delay_ms(2);
+    mcp_write_reg(MCP_CANCTRL, 0x08U);
 }
 
 volatile uint8_t g_bl_canstat;
 volatile uint8_t g_bl_canctrl;
+volatile uint8_t g_bl_loopback;
 
 int mcp2515_rx_available(void) {
     return (mcp_read_reg(MCP_CANINTF) & (MCP_CANINTF_RX0IF | MCP_CANINTF_RX1IF)) ? 1 : 0;
