@@ -89,6 +89,7 @@ static char  cmd_buf[CMD_BUF_LEN];
 static int   cmd_len = 0;
 
 static void cmd_reset(void) { cmd_len = 0; }
+static void cmd_add_char(char c) { if (cmd_len < CMD_BUF_LEN - 1) cmd_buf[cmd_len++] = c; }
 
 /* -----------------------------------------------------------------------
  * Print help text
@@ -335,20 +336,52 @@ int main(void)
     /* 3. USART1 at 115200 */
     usart1_init(115200);
 
-    /* 4. MCP2515 — default 500kbps, bus starts closed (listen-only) */
-    mcp2515_init(MCP_BRATE_500K);
-    g_brate = MCP_BRATE_500K;
+    /* 4. MCP2515 — start at 250 kbps (matches Pico 2 ODrive CAN gateway default).
+     * Auto-open after a 2 s boot window: if no serial command arrives in that
+     * window the bus opens automatically. This lets the board work as a sniffer
+     * without needing a USB-UART adapter connected first. */
+    mcp2515_init(MCP_BRATE_250K);   /* 250 kbps = Pico 2 / ODrive default */
+    g_brate   = MCP_BRATE_250K;
     g_can_open = 0;
-    g_mode = MODE_CAN;
+    g_mode    = MODE_CAN;
 
     /* 5. Banner */
     usart1_print("\r\nBlue Pill CAN Tool v1\r\n");
     usart1_print("Pins: CAN=PA4-PA7(SPI1)+PB0(INT)  1wire=PB10(USART3)  Serial=PA9/PA10\r\n");
+    usart1_print("250kbps (ODrive default). Auto-open in 2s if no serial command.\r\n");
     usart1_print("SLCAN: O=open C=close S6=500k t/T=tx r=rtr F=flags s=stat\r\n");
-    usart1_print("Bridge: mode uart <baud>  Return: mode can\r\n");
     usart1_print(">");
 
     cmd_reset();
+
+    /* ---- 2-second auto-open window ----
+     * Poll serial for 2 s. If user types any character (e.g. 'C' to stay
+     * closed, or 'S5' to change rate), honour it. Otherwise open the bus.
+     * This allows headless operation (no USB-UART adapter required for basic
+     * sniffing): the LED will blink when CAN frames arrive.               */
+    {
+        /* ~2667 loops = 1 ms at 8 MHz; 2000 × 2667 ≈ 2 s */
+        uint32_t remaining = 2000U;  /* ms */
+        uint8_t  user_acted = 0;
+        while (remaining-- && !user_acted) {
+            volatile uint32_t c = 2667;
+            while (c--);
+            int ch = usart1_getchar_nb();
+            if (ch >= 0) {
+                /* Echo the char back into the command buffer so it's processed */
+                usart1_tx_byte((uint8_t)ch);
+                cmd_add_char((char)ch);
+                user_acted = 1;   /* user is present — don't auto-open */
+            }
+        }
+        if (!user_acted) {
+            /* No serial input — auto-open for headless sniffer mode */
+            if (mcp2515_enter_normal() == 0) {
+                g_can_open = 1;
+                usart1_print("\r\n[AUTO] Bus open at 250kbps — LED blinks on RX\r\n>");
+            }
+        }
+    }
 
     /* ---- Main polling loop ---- */
     while (1) {
