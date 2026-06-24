@@ -1,0 +1,59 @@
+# Captured from flo199213/Hoverboard-Firmware-Hack-Gen2 (master config)
+# Source: https://github.com/flo199213/Hoverboard-Firmware-Hack-Gen2 → HoverBoardGigaDevice/Inc/defines.h
+#
+# Single-motor Gen2 GD32F130 variant. Pin layout matches RoboDurden Gen2.x
+# LAYOUT 1-1 except CHARGE_STATE is on PA0 instead of PF0. The "MASTER" conditional
+# enables BUZZER on PB10 and CHARGE_STATE on PA0.
+
+[meta]
+name = "flo199213 Hoverboard-Firmware-Hack-Gen2 (GD32F130, master node)"
+source = "imported-from-flo199213/Hoverboard-Firmware-Hack-Gen2"
+notes = "Identical to RoboDurden Gen2.x LAYOUT 1-1 except charger detect on PA0 (vs PF0). This is the MASTER role config — SLAVE config would have CHARGE_STATE undefined and BUZZER stripped."
+confidence = 1.0
+
+[chip]
+family = "GD32F1"
+part_hint = "GD32F130C8T6"
+
+[power]
+self_hold = "PB2"
+self_hold_active_high = true
+
+[halls_right]
+hall_a = "PB11"
+hall_b = "PF1"
+hall_c = "PC14"
+
+[phases_right]
+timer = "TIMER0"
+u_high = "PA8"
+u_low = "PB13"
+v_high = "PA9"
+v_low = "PB14"
+w_high = "PA10"
+w_low = "PB15"
+dead_time_ns = 833
+
+[indicators]
+led_green = "PA15"
+led_orange = "PA12"
+led_red = "PB3"
+buzzer = "PB10"
+
+[inputs]
+button = "PC15"
+button_active_low = true
+charger_detect = "PA0"
+charger_active_low = true
+
+[sensing.battery_voltage]
+adc_unit = 1
+channel = 4
+on_pin = { port = "A", pin = 4 }
+divider = 13.0
+
+[sensing.left_phase_current]
+adc_unit = 1
+channel = 6
+on_pin = { port = "A", pin = 6 }
+shunt_resistor_milliohms = 1.0

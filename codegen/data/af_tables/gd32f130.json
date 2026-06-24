@@ -1,0 +1,27 @@
+{
+  "_meta": {
+    "family": "GD32F1",
+    "part_hint": "GD32F130 / GD32F130C8T6",
+    "source": "GigaDevice GD32F1x0 User Manual (V3.5 or later), GPIO alternate function tables. GD32F130 is pin-compatible with STM32F0 family in many respects but uses GD's own AF mapping.",
+    "notes": "Phase outputs on TIMER0 (= TIM1 equivalent). GD32F130C8T6 has 48 pins, restricting some choices vs. F103.",
+    "license": "Transcribed from public datasheet; no copyright on hardware register definitions."
+  },
+  "PA8":  [{"peripheral": "TIMER0", "channel": "CH0", "af": 2}],
+  "PA9":  [{"peripheral": "TIMER0", "channel": "CH1", "af": 2}, {"peripheral": "USART0", "channel": "TX", "af": 1}],
+  "PA10": [{"peripheral": "TIMER0", "channel": "CH2", "af": 2}, {"peripheral": "USART0", "channel": "RX", "af": 1}],
+  "PA11": [{"peripheral": "TIMER0", "channel": "CH3", "af": 2}],
+  "PA7":  [{"peripheral": "TIMER0", "channel": "CH0N", "af": 2}],
+  "PB0":  [{"peripheral": "TIMER0", "channel": "CH1N", "af": 2}],
+  "PB1":  [{"peripheral": "TIMER0", "channel": "CH2N", "af": 2}],
+  "PB13": [{"peripheral": "TIMER0", "channel": "CH0N", "af": 2}],
+  "PB14": [{"peripheral": "TIMER0", "channel": "CH1N", "af": 2}],
+  "PB15": [{"peripheral": "TIMER0", "channel": "CH2N", "af": 2}],
+  "PA0":  [{"peripheral": "TIMER1", "channel": "CH0", "af": 2}],
+  "PA1":  [{"peripheral": "TIMER1", "channel": "CH1", "af": 2}],
+  "PA2":  [{"peripheral": "TIMER1", "channel": "CH2", "af": 2}],
+  "PA3":  [{"peripheral": "TIMER1", "channel": "CH3", "af": 2}],
+  "PA4":  [{"peripheral": "TIMER13", "channel": "CH0", "af": 4}],
+  "PA6":  [{"peripheral": "TIMER2", "channel": "CH0", "af": 1}],
+  "PB6":  [{"peripheral": "TIMER15", "channel": "CH0N", "af": 2}, {"peripheral": "I2C0", "channel": "SCL", "af": 1}],
+  "PB7":  [{"peripheral": "TIMER16", "channel": "CH0N", "af": 2}, {"peripheral": "I2C0", "channel": "SDA", "af": 1}]
+}

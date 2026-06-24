@@ -1,0 +1,32 @@
+{
+  "_meta": {
+    "family": "STM32F1",
+    "part_hint": "STM32F103",
+    "source": "ST RM0008 reference manual table 'Alternate function I/O and debug configuration', AFIO_MAPR remap regs",
+    "notes": "STM32F1 uses AFIO_MAPR for remap; default (no remap) selected here. Full remap is data/af_tables/stm32f103_remap.json (TODO).",
+    "license": "Transcribed from public datasheet; no copyright on hardware register definitions."
+  },
+  "PA8":  [{"peripheral": "TIM1", "channel": "CH1",  "remap": 0}],
+  "PA9":  [{"peripheral": "TIM1", "channel": "CH2",  "remap": 0}, {"peripheral": "USART1", "channel": "TX"}],
+  "PA10": [{"peripheral": "TIM1", "channel": "CH3",  "remap": 0}, {"peripheral": "USART1", "channel": "RX"}],
+  "PA11": [{"peripheral": "TIM1", "channel": "CH4",  "remap": 0}, {"peripheral": "USB",    "channel": "DM"}],
+  "PB13": [{"peripheral": "TIM1", "channel": "CH1N", "remap": 0}, {"peripheral": "SPI2",   "channel": "SCK"}],
+  "PB14": [{"peripheral": "TIM1", "channel": "CH2N", "remap": 0}, {"peripheral": "SPI2",   "channel": "MISO"}],
+  "PB15": [{"peripheral": "TIM1", "channel": "CH3N", "remap": 0}, {"peripheral": "SPI2",   "channel": "MOSI"}],
+  "PC6":  [{"peripheral": "TIM8", "channel": "CH1",  "remap": 0}],
+  "PC7":  [{"peripheral": "TIM8", "channel": "CH2",  "remap": 0}],
+  "PC8":  [{"peripheral": "TIM8", "channel": "CH3",  "remap": 0}],
+  "PC9":  [{"peripheral": "TIM8", "channel": "CH4",  "remap": 0}],
+  "PA7":  [{"peripheral": "TIM8", "channel": "CH1N", "remap": 0}, {"peripheral": "TIM3",  "channel": "CH2"}, {"peripheral": "SPI1", "channel": "MOSI"}],
+  "PB0":  [{"peripheral": "TIM8", "channel": "CH2N", "remap": 0}, {"peripheral": "TIM3",  "channel": "CH3"}],
+  "PB1":  [{"peripheral": "TIM8", "channel": "CH3N", "remap": 0}, {"peripheral": "TIM3",  "channel": "CH4"}],
+  "PA0":  [{"peripheral": "TIM2", "channel": "CH1",  "remap": 0}, {"peripheral": "USART2","channel": "CTS"}],
+  "PA1":  [{"peripheral": "TIM2", "channel": "CH2",  "remap": 0}, {"peripheral": "USART2","channel": "RTS"}],
+  "PA2":  [{"peripheral": "TIM2", "channel": "CH3",  "remap": 0}, {"peripheral": "USART2","channel": "TX"}],
+  "PA3":  [{"peripheral": "TIM2", "channel": "CH4",  "remap": 0}, {"peripheral": "USART2","channel": "RX"}],
+  "PA6":  [{"peripheral": "TIM3", "channel": "CH1",  "remap": 0}, {"peripheral": "SPI1", "channel": "MISO"}],
+  "PB6":  [{"peripheral": "TIM4", "channel": "CH1",  "remap": 0}, {"peripheral": "I2C1", "channel": "SCL"}],
+  "PB7":  [{"peripheral": "TIM4", "channel": "CH2",  "remap": 0}, {"peripheral": "I2C1", "channel": "SDA"}],
+  "PB8":  [{"peripheral": "TIM4", "channel": "CH3",  "remap": 0}, {"peripheral": "I2C1", "channel": "SCL"}],
+  "PB9":  [{"peripheral": "TIM4", "channel": "CH4",  "remap": 0}, {"peripheral": "I2C1", "channel": "SDA"}]
+}

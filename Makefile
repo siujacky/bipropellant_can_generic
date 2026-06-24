@@ -58,7 +58,14 @@ src/BLDC_controller_data.c \
 src/BLDC_controller.c \
 src/mcp2515.c \
 src/software_spi.c \
-src/can_bus.c
+src/can_bus.c \
+src/board_select.c \
+src/board_override.c \
+generated/board_table_stm32f1.c \
+generated/board_af_validity_stm32f1.c \
+src/phasemap.c \
+src/uart_hdsel.c \
+src/chip_detect.c
 
 
 # ASM sources
@@ -108,6 +115,7 @@ AS_INCLUDES =
 # C includes
 C_INCLUDES =  \
 -Iinc \
+-Igenerated \
 -Isrc/hbprotocol \
 -IDrivers/STM32F1xx_HAL_Driver/Inc \
 -IDrivers/STM32F1xx_HAL_Driver/Inc/Legacy \
@@ -118,6 +126,10 @@ C_INCLUDES =  \
 # compile gcc flags
 ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
 
+# -fcommon: this firmware predates GCC 10's -fno-common default and relies on
+# merged tentative definitions (rtP, hdma_i2c2_*) across translation units.
+# Without it modern arm-none-eabi-gcc (>=10) fails to link with "multiple
+# definition" errors. (PlatformIO's older toolchain defaulted to -fcommon.)
 CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections -std=gnu11
 
 ifeq ($(DEBUG), 1)
@@ -191,5 +203,218 @@ unlock:
 # dependencies
 #######################################
 -include $(shell mkdir .dep 2>/dev/null) $(wildcard .dep/*)
+
+# =============================================================================
+# M5 scaffold: per-family smoke builds (motor-disabled)
+#
+# Each env builds a minimal smoke .bin that:
+#   - boots (clock init via system_<fam>.c, startup_<fam>.s)
+#   - runs board_select/override (with the family-filtered board_table)
+#   - links hal_motor_<fam>.c (MOTOR-DISABLED stub — no phase PWM init)
+#
+# Motor-disabled smoke only — NOT for production use.
+# Verify clock tree and peripheral init on hardware before enabling motors.
+#
+# Usage:
+#   make env-gd32f1      # GD32F130 smoke .bin (Cortex-M3)
+#   make env-gd32e2      # GD32E230 smoke .bin (Cortex-M23)
+#   make env-mm32spin0x  # MM32SPIN05 smoke .bin (Cortex-M0)
+#   make env-all         # all three smoke builds
+#   make env-clean       # remove all smoke build artefacts
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Smoke-build common sources (shared by all non-STM32F1 envs)
+# ---------------------------------------------------------------------------
+SMOKE_COMMON_SRCS = \
+	src/board_select.c \
+	src/board_override.c \
+	src/main_smoke.c
+
+SMOKE_COMMON_INC = \
+	-Iinc/smoke_hal \
+	-Iinc \
+	-Igenerated \
+	-Isrc/hbprotocol
+
+SMOKE_COMMON_DEFS = \
+	-DUSE_HAL_DRIVER
+
+SMOKE_COMMON_FLAGS = \
+	-mthumb \
+	-std=gnu11 \
+	-Wall \
+	-Og \
+	-fdata-sections \
+	-ffunction-sections
+
+SMOKE_LDFLAGS_COMMON = \
+	-specs=nano.specs \
+	-lc -lm -lnosys \
+	-Wl,--gc-sections
+
+# ---------------------------------------------------------------------------
+# env:gd32f1 — GD32F130 (Cortex-M3, BOARD_FAMILY_GD32F1)
+# ---------------------------------------------------------------------------
+GD32F1_BUILD = build/env-gd32f1
+GD32F1_TARGET = hover-gd32f1
+
+GD32F1_SRCS = \
+	$(SMOKE_COMMON_SRCS) \
+	src/system_gd32f1.c \
+	src/hal_motor_gd32f1.c \
+	generated/board_table_gd32f1.c \
+	generated/board_af_validity_gd32f1.c
+
+GD32F1_ASM = startup_gd32f1.s
+
+GD32F1_DEFS = $(SMOKE_COMMON_DEFS) -DBUILD_FAMILY_GD32F1
+
+GD32F1_CFLAGS = $(SMOKE_COMMON_FLAGS) -mcpu=cortex-m3 $(GD32F1_DEFS) $(SMOKE_COMMON_INC)
+
+GD32F1_OBJS = \
+	$(addprefix $(GD32F1_BUILD)/,$(notdir $(GD32F1_SRCS:.c=.o))) \
+	$(GD32F1_BUILD)/$(notdir $(GD32F1_ASM:.s=.o))
+
+vpath %.c $(sort $(dir $(GD32F1_SRCS)))
+vpath %.s .
+
+$(GD32F1_BUILD)/%.o: %.c | $(GD32F1_BUILD)
+	$(CC) -c $(GD32F1_CFLAGS) $< -o $@
+
+$(GD32F1_BUILD)/%.o: %.s | $(GD32F1_BUILD)
+	$(AS) -c $(GD32F1_CFLAGS) $< -o $@
+
+$(GD32F1_BUILD)/$(GD32F1_TARGET).elf: $(GD32F1_OBJS)
+	$(CC) $(GD32F1_OBJS) -mcpu=cortex-m3 -mthumb \
+		$(SMOKE_LDFLAGS_COMMON) \
+		-T gd32f1_flash.ld \
+		-Wl,-Map=$(GD32F1_BUILD)/$(GD32F1_TARGET).map,--cref \
+		-o $@
+	$(SZ) $@
+
+$(GD32F1_BUILD)/$(GD32F1_TARGET).bin: $(GD32F1_BUILD)/$(GD32F1_TARGET).elf | $(GD32F1_BUILD)
+	$(BIN) $< $@
+
+$(GD32F1_BUILD):
+	mkdir -p $@
+
+env-gd32f1: $(GD32F1_BUILD)/$(GD32F1_TARGET).bin
+	@echo "OK: env-gd32f1 smoke .bin built: $<"
+	@echo "    Motor-disabled smoke only — bench-validate before enabling motors."
+
+# ---------------------------------------------------------------------------
+# env:gd32e2 — GD32E230 (Cortex-M23, BOARD_FAMILY_GD32E2)
+# ---------------------------------------------------------------------------
+GD32E2_BUILD = build/env-gd32e2
+GD32E2_TARGET = hover-gd32e2
+
+GD32E2_SRCS = \
+	$(SMOKE_COMMON_SRCS) \
+	src/system_gd32e2.c \
+	src/hal_motor_gd32e2.c \
+	generated/board_table_gd32e2.c \
+	generated/board_af_validity_gd32e2.c
+
+GD32E2_ASM = startup_gd32e2.s
+
+GD32E2_DEFS = $(SMOKE_COMMON_DEFS) -DBUILD_FAMILY_GD32E2
+
+# NOTE: Cortex-M23 requires -mcpu=cortex-m23 (NOT cortex-m3)
+GD32E2_CFLAGS = $(SMOKE_COMMON_FLAGS) -mcpu=cortex-m23 $(GD32E2_DEFS) $(SMOKE_COMMON_INC)
+
+GD32E2_OBJS = \
+	$(addprefix $(GD32E2_BUILD)/,$(notdir $(GD32E2_SRCS:.c=.o))) \
+	$(GD32E2_BUILD)/$(notdir $(GD32E2_ASM:.s=.o))
+
+vpath %.c $(sort $(dir $(GD32E2_SRCS)))
+
+$(GD32E2_BUILD)/%.o: %.c | $(GD32E2_BUILD)
+	$(CC) -c $(GD32E2_CFLAGS) $< -o $@
+
+$(GD32E2_BUILD)/%.o: %.s | $(GD32E2_BUILD)
+	$(AS) -c $(GD32E2_CFLAGS) $< -o $@
+
+$(GD32E2_BUILD)/$(GD32E2_TARGET).elf: $(GD32E2_OBJS)
+	$(CC) $(GD32E2_OBJS) -mcpu=cortex-m23 -mthumb \
+		$(SMOKE_LDFLAGS_COMMON) \
+		-T gd32e2_flash.ld \
+		-Wl,-Map=$(GD32E2_BUILD)/$(GD32E2_TARGET).map,--cref \
+		-o $@
+	$(SZ) $@
+
+$(GD32E2_BUILD)/$(GD32E2_TARGET).bin: $(GD32E2_BUILD)/$(GD32E2_TARGET).elf | $(GD32E2_BUILD)
+	$(BIN) $< $@
+
+$(GD32E2_BUILD):
+	mkdir -p $@
+
+env-gd32e2: $(GD32E2_BUILD)/$(GD32E2_TARGET).bin
+	@echo "OK: env-gd32e2 smoke .bin built: $<"
+	@echo "    Motor-disabled smoke only — bench-validate before enabling motors."
+	@echo "    NOTE: Cortex-M23 — use -mcpu=cortex-m23 toolchain flag."
+
+# ---------------------------------------------------------------------------
+# env:mm32spin0x — MM32SPIN05 (Cortex-M0, BOARD_FAMILY_MM32SPIN0X)
+# ---------------------------------------------------------------------------
+MM32_BUILD = build/env-mm32spin0x
+MM32_TARGET = hover-mm32spin0x
+
+MM32_SRCS = \
+	$(SMOKE_COMMON_SRCS) \
+	src/system_mm32spin0x.c \
+	src/hal_motor_mm32spin0x.c \
+	generated/board_table_mm32spin0x.c \
+	generated/board_af_validity_mm32spin0x.c
+
+MM32_ASM = startup_mm32spin0x.s
+
+MM32_DEFS = $(SMOKE_COMMON_DEFS) -DBUILD_FAMILY_MM32SPIN0X
+
+# NOTE: MM32SPIN0x is Cortex-M0 — use -mcpu=cortex-m0 (NOT cortex-m3)
+MM32_CFLAGS = $(SMOKE_COMMON_FLAGS) -mcpu=cortex-m0 $(MM32_DEFS) $(SMOKE_COMMON_INC)
+
+MM32_OBJS = \
+	$(addprefix $(MM32_BUILD)/,$(notdir $(MM32_SRCS:.c=.o))) \
+	$(MM32_BUILD)/$(notdir $(MM32_ASM:.s=.o))
+
+vpath %.c $(sort $(dir $(MM32_SRCS)))
+
+$(MM32_BUILD)/%.o: %.c | $(MM32_BUILD)
+	$(CC) -c $(MM32_CFLAGS) $< -o $@
+
+$(MM32_BUILD)/%.o: %.s | $(MM32_BUILD)
+	$(AS) -c $(MM32_CFLAGS) $< -o $@
+
+$(MM32_BUILD)/$(MM32_TARGET).elf: $(MM32_OBJS)
+	$(CC) $(MM32_OBJS) -mcpu=cortex-m0 -mthumb \
+		$(SMOKE_LDFLAGS_COMMON) \
+		-T mm32spin0x_flash.ld \
+		-Wl,-Map=$(MM32_BUILD)/$(MM32_TARGET).map,--cref \
+		-o $@
+	$(SZ) $@
+
+$(MM32_BUILD)/$(MM32_TARGET).bin: $(MM32_BUILD)/$(MM32_TARGET).elf | $(MM32_BUILD)
+	$(BIN) $< $@
+
+$(MM32_BUILD):
+	mkdir -p $@
+
+env-mm32spin0x: $(MM32_BUILD)/$(MM32_TARGET).bin
+	@echo "OK: env-mm32spin0x smoke .bin built: $<"
+	@echo "    Motor-disabled smoke only — bench-validate before enabling motors."
+	@echo "    NOTE: Cortex-M0 (HIGHEST RISK family) — verify RCC register map before use."
+
+# ---------------------------------------------------------------------------
+# env-all: build all three smoke envs
+# ---------------------------------------------------------------------------
+env-all: env-gd32f1 env-gd32e2 env-mm32spin0x
+	@echo "All smoke builds complete."
+
+# ---------------------------------------------------------------------------
+# env-clean: remove all smoke build artefacts
+# ---------------------------------------------------------------------------
+env-clean:
+	-rm -fR build/env-gd32f1 build/env-gd32e2 build/env-mm32spin0x
 
 # *** EOF ***

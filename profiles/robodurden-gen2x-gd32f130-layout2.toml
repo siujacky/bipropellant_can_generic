@@ -1,0 +1,57 @@
+# Captured from RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32 (TARGET=1, LAYOUT=2)
+# Source: defines_2-1-2.h
+# GD32F130 single-motor sideboard, alternate layout (different hall + IO pins).
+# Note: in this layout LED_RED and BUTTON both reference PA5 in the headers —
+# only one is wired on a given physical board. We record BUTTON; LED_RED left blank.
+
+[meta]
+name = "RoboDurden Gen2.x-GD32 LAYOUT 1-2 (GD32F130 alt)"
+source = "imported-from-RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32"
+notes = "Alternate IO layout for GD32F130. LED_RED conflict with BUTTON on PA5 — kept BUTTON."
+confidence = 0.9
+
+[chip]
+family = "GD32F1"
+part_hint = "GD32F130C8T6"
+
+[power]
+self_hold = "PB2"
+self_hold_active_high = true
+
+[halls_right]
+hall_a = "PA0"
+hall_b = "PA1"
+hall_c = "PB11"
+
+[phases_right]
+timer = "TIMER0"
+u_high = "PA8"
+u_low = "PB13"
+v_high = "PA9"
+v_low = "PB14"
+w_high = "PA10"
+w_low = "PB15"
+dead_time_ns = 833
+
+[indicators]
+led_green = "PB3"
+led_orange = "PB4"
+buzzer = "PB9"
+
+[inputs]
+button = "PA5"
+button_active_low = true
+charger_detect = "PC15"
+charger_active_low = true
+
+[sensing.battery_voltage]
+adc_unit = 1
+channel = 4
+on_pin = { port = "A", pin = 4 }
+divider = 13.0
+
+[sensing.left_phase_current]
+adc_unit = 1
+channel = 6
+on_pin = { port = "A", pin = 6 }
+shunt_resistor_milliohms = 1.0

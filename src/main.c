@@ -36,6 +36,9 @@
 
 #include "deadreckoner.h"
 #include "control_structures.h"
+#include "board_active.h"
+#include "board_override.h"
+#include "phasemap.h"
 
 #ifdef ENABLE_CAN_BUS
 #include "can_bus.h"
@@ -136,7 +139,8 @@ void poweroff() {
         }
         buzzerFreq = 0;
         HAL_Delay(100);
-        HAL_GPIO_WritePin(OFF_PORT, OFF_PIN, 0);
+        HAL_GPIO_WritePin(BOARD_GP_PORT(ACTIVE.self_hold, OFF_PORT),
+                          BOARD_GP_MASK(ACTIVE.self_hold, OFF_PIN), GPIO_PIN_RESET);
 
         // if we are powered from sTLink, this bit allows the system to be started again with the button.
         while (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN)) {}
@@ -278,6 +282,49 @@ void init_flash_content(){
 int main(void) {
   HAL_Init();
   __HAL_RCC_AFIO_CLK_ENABLE();
+
+  // ----------------------------------------------------------------------
+  // SELF-HOLD LATCH FIRST.
+  // Drive the self-hold / OFF_PIN HIGH as the VERY FIRST GPIO action, using a
+  // board-independent compile-time safe default (defines.h OFF_PORT/OFF_PIN).
+  // This keeps the power latched before board_select_init() + flash read so
+  // flash-read latency can never delay the power latch and overrun the
+  // power-button hold window. The self_hold identity is the only pin we need
+  // pre-latch; its override is reboot-only / non-auto-detectable.
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  {
+    GPIO_InitTypeDef selfHoldInit;
+    memset(&selfHoldInit, 0, sizeof(selfHoldInit));
+    selfHoldInit.Mode  = GPIO_MODE_OUTPUT_PP;
+    selfHoldInit.Speed = GPIO_SPEED_FREQ_LOW;
+    selfHoldInit.Pull  = GPIO_NOPULL;
+    selfHoldInit.Pin   = OFF_PIN;
+    HAL_GPIO_Init(OFF_PORT, &selfHoldInit);
+    HAL_GPIO_WritePin(OFF_PORT, OFF_PIN, GPIO_PIN_SET);
+  }
+
+  // Load FlashContent from flash NOW — BEFORE board_select_init() — so the
+  // NVRAM stored-index tier (board_override_valid / board_selected_index) and
+  // the persisted pin-override set are populated rather than zero-initialized
+  // BSS. Must run after the self-hold latch (above) and before peripheral init.
+  // CAN init below still sees a fully-populated FlashContent (CAN IDs, etc.).
+  init_flash_content();
+
+  // Resolve the ACTIVE profile from the (now loaded) FlashContent selector
+  // fields. Runs AFTER the self-hold latch, BEFORE peripheral init, so
+  // reboot-only overrides take effect on the next boot exactly as silicon
+  // requires.
+  board_select_init();
+
+  // Re-apply persisted pin overrides into ACTIVE on top of the resolved base
+  // row. Must run after board_select_init() (so the base row is in place) and
+  // after FlashContent is loaded, and BEFORE setup.c peripheral init
+  // (MX_GPIO_Init/MX_TIM_Init/MX_ADC*_Init) so the staged ACTIVE pins are the
+  // source for all peripheral configuration.
+  board_override_boot_replay();
+
   HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
   /* System interrupt init*/
   /* MemoryManagement_IRQn interrupt configuration */
@@ -317,7 +364,11 @@ int main(void) {
 
   memset((void*)&electrical_measurements, 0, sizeof(electrical_measurements));
 
-  HAL_GPIO_WritePin(OFF_PORT, OFF_PIN, 1);
+  // Self-hold already latched HIGH at the top of main() (board-independent
+  // default). Re-assert via the ACTIVE-sourced port/pin so a selected profile's
+  // self_hold takes effect; falls back to OFF_PORT/OFF_PIN for the safe row.
+  HAL_GPIO_WritePin(BOARD_GP_PORT(ACTIVE.self_hold, OFF_PORT),
+                    BOARD_GP_MASK(ACTIVE.self_hold, OFF_PIN), GPIO_PIN_SET);
 
   HAL_ADC_Start(&hadc1);
   HAL_ADC_Start(&hadc2);
@@ -343,8 +394,8 @@ int main(void) {
     #endif
   #endif
 
-  // Initialize flash content BEFORE CAN init (so CAN IDs are available)
-  init_flash_content();
+  // FlashContent was already loaded earlier (before board_select_init), so CAN
+  // IDs and all persisted fields are available here without re-reading flash.
 
   #ifdef ENABLE_CAN_BUS
   // Small delay to ensure UART is stable (moved here to avoid early HAL_Delay issues)
@@ -382,7 +433,8 @@ int main(void) {
   }
   buzzerFreq = 0;
 
-  HAL_GPIO_WritePin(LED_PORT, LED_PIN, 1);
+  HAL_GPIO_WritePin(BOARD_GP_PORT(ACTIVE.led_green, LED_PORT),
+                    BOARD_GP_MASK(ACTIVE.led_green, LED_PIN), GPIO_PIN_SET);
 
   //int lastspeeds[2] = {0, 0};
 
@@ -498,7 +550,13 @@ int main(void) {
       #if (INCLUDE_PROTOCOL == INCLUDE_PROTOCOL2)
         #ifdef SOFTWARE_SERIAL
           while ( softwareserial_available() > 0 ) {
-            protocol_byte( &sSoftwareSerial, (unsigned char) softwareserial_getrx() );
+            unsigned char rxc = (unsigned char) softwareserial_getrx();
+            /* Route single chars to phasemap wizard when it is waiting for input */
+            if (phasemap_state() != PM_IDLE && phasemap_state() != PM_DONE &&
+                phasemap_state() != PM_ABORTED) {
+              phasemap_char((char)rxc);
+            }
+            protocol_byte( &sSoftwareSerial, rxc );
           }
           protocol_tick( &sSoftwareSerial );
         #endif
@@ -507,7 +565,12 @@ int main(void) {
           // if we enabled USART2 as protocol from power button at startup
           if (USART2ProtocolEnable) {
             while ( serial_usart_buffer_count(&usart2_it_RXbuffer) > 0 ) {
-              protocol_byte( &sUSART2, (unsigned char) serial_usart_buffer_pop(&usart2_it_RXbuffer) );
+              unsigned char rxc = (unsigned char) serial_usart_buffer_pop(&usart2_it_RXbuffer);
+              if (phasemap_state() != PM_IDLE && phasemap_state() != PM_DONE &&
+                  phasemap_state() != PM_ABORTED) {
+                phasemap_char((char)rxc);
+              }
+              protocol_byte( &sUSART2, rxc );
             }
             protocol_tick( &sUSART2 );
           }
@@ -515,18 +578,28 @@ int main(void) {
 
         #if defined(SERIAL_USART2_IT) && !defined(CONTROL_SENSOR)
           while ( serial_usart_buffer_count(&usart2_it_RXbuffer) > 0 ) {
-            protocol_byte( &sUSART2, (unsigned char) serial_usart_buffer_pop(&usart2_it_RXbuffer) );
+            unsigned char rxc = (unsigned char) serial_usart_buffer_pop(&usart2_it_RXbuffer);
+            if (phasemap_state() != PM_IDLE && phasemap_state() != PM_DONE &&
+                phasemap_state() != PM_ABORTED) {
+              phasemap_char((char)rxc);
+            }
+            protocol_byte( &sUSART2, rxc );
           }
           protocol_tick( &sUSART2 );
         #endif
 
         #if defined(SERIAL_USART3_IT) && !defined(CONTROL_SENSOR)
           while ( serial_usart_buffer_count(&usart3_it_RXbuffer) > 0 ) {
-            protocol_byte( &sUSART3, (unsigned char) serial_usart_buffer_pop(&usart3_it_RXbuffer) );
+            unsigned char rxc = (unsigned char) serial_usart_buffer_pop(&usart3_it_RXbuffer);
+            if (phasemap_state() != PM_IDLE && phasemap_state() != PM_DONE &&
+                phasemap_state() != PM_ABORTED) {
+              phasemap_char((char)rxc);
+            }
+            protocol_byte( &sUSART3, rxc );
           }
           protocol_tick( &sUSART3 );
         #endif
-        
+
         #ifdef ENABLE_CAN_BUS
           // Process CAN bus messages if in CAN mode
           CAN_ProcessMessages();
@@ -544,6 +617,11 @@ int main(void) {
 
     // read last DMAed ADC values, moved from bldc interrupt to non interrupt.
     readADCs();
+
+    /* PhaseMap Wizard tick — advances the state machine once per main loop
+     * iteration.  Safe to call at all times: returns immediately in PM_IDLE,
+     * PM_DONE, and PM_ABORTED states.  Never call from an ISR context. */
+    phasemap_tick();
 
     /////////////////////////////////////
     // proceesing starts after we hit 5ms interval
@@ -866,7 +944,9 @@ int main(void) {
       electrical_measurements.board_temp_raw = adc_buffer.temp;
       electrical_measurements.board_temp_filtered = board_temp_adc_filtered;
       electrical_measurements.board_temp_deg_c = board_temp_deg_c;
-      electrical_measurements.charging = !(CHARGER_PORT->IDR & CHARGER_PIN);
+      /* ACTIVE-sourced so a runtime charger-pin override changes the real
+       * charging logic, not just the debug print (active-low). */
+      electrical_measurements.charging = !BOARD_GPIO_READ(ACTIVE.charger, CHARGER_PORT, CHARGER_PIN);
 
       // ####### DEBUG SERIAL OUT #######
       #ifdef CONTROL_ADC

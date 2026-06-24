@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "family": "MM32SPIN0X",
+    "part_hint": "MM32SPIN05PF / MM32SPIN27PS — Chinese MindMotion brushless-motor MCUs",
+    "source": "MindMotion MM32SPIN0X user manual (Mandarin Chinese; rough translation from datasheet tables). MM32 cores are typically Cortex-M0+ with STM32F0-like peripherals. TIM1 acts as the advanced-control timer with complementary outputs.",
+    "notes": "Best-effort transcription. Verify against vendor datasheet for production use. Hoverboards using this chip typically have identical phase pinout to STM32F0-class chips.",
+    "license": "Transcribed from public datasheet; no copyright on hardware register definitions."
+  },
+  "PA8":  [{"peripheral": "TIM1", "channel": "CH1",  "af": 2}],
+  "PA9":  [{"peripheral": "TIM1", "channel": "CH2",  "af": 2}],
+  "PA10": [{"peripheral": "TIM1", "channel": "CH3",  "af": 2}],
+  "PA11": [{"peripheral": "TIM1", "channel": "CH4",  "af": 2}],
+  "PA7":  [{"peripheral": "TIM1", "channel": "CH1N", "af": 2}],
+  "PB0":  [{"peripheral": "TIM1", "channel": "CH2N", "af": 2}],
+  "PB1":  [{"peripheral": "TIM1", "channel": "CH3N", "af": 2}],
+  "PB13": [{"peripheral": "TIM1", "channel": "CH1N", "af": 2}],
+  "PB14": [{"peripheral": "TIM1", "channel": "CH2N", "af": 2}],
+  "PB15": [{"peripheral": "TIM1", "channel": "CH3N", "af": 2}]
+}

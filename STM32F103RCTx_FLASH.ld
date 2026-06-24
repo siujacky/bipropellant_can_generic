@@ -38,12 +38,20 @@ _estack = 0x2000C000;    /* end of RAM */
 _Min_Heap_Size = 0x200;      /* required amount of heap  */
 _Min_Stack_Size = 0x400; /* required amount of stack */
 _Reserved_Space = 0x800;
-/* Specify the memory areas */
+/* Flash layout (A/B dual-slot bootloader):
+ *   0x08000000 ..0x08001FFF   8 KB  Bootloader (do not modify)
+ *   0x08002000 ..0x0801FFFF 120 KB  SLOT A — Primary   (this linker script)
+ *   0x08020000 ..0x0803DFFF 120 KB  SLOT B — Secondary (use STM32F103RCTx_FLASH_SLOTB.ld)
+ *   0x0803E000 ..0x0803FFFF   8 KB  Bootloader config + Application NVRAM
+ *
+ * To build a Slot B image: copy this file, set ORIGIN=0x08020000.
+ * The linker enforces LENGTH=120K so the app cannot overflow into Slot B
+ * or the config/NVRAM region. */
 MEMORY
 {
 RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 48K
-FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 256K - _Reserved_Space
-RESERVED_FLASH (rw) : ORIGIN = 0x8000000 + 256K - _Reserved_Space, LENGTH = _Reserved_Space
+FLASH (rx)      : ORIGIN = 0x08002000, LENGTH = 120K - _Reserved_Space
+RESERVED_FLASH (rw) : ORIGIN = 0x08002000 + 120K - _Reserved_Space, LENGTH = _Reserved_Space
 }
 
 /* Define output sections */

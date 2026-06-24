@@ -20,6 +20,9 @@
 #include "stm32f1xx_hal.h"
 #include "defines.h"
 #include "config.h"
+#include "board_active.h"
+#include "phasemap.h"
+#include "bootloader_request.h"
 
 
 #ifdef CONTROL_SENSOR
@@ -252,8 +255,8 @@ int immediate_stm32(PROTOCOL_STAT *s, char byte, char *ascii_out) {
         "A:%04X B:%04X C:%04X D:%04X E:%04X\r\n"\
         "Button: %d Charge:%d\r\n",
         (int)GPIOA->IDR, (int)GPIOB->IDR, (int)GPIOC->IDR, (int)GPIOD->IDR, (int)GPIOE->IDR,
-        (int)(BUTTON_PORT->IDR & BUTTON_PIN)?1:0,
-        (int)(CHARGER_PORT->IDR & CHARGER_PIN)?1:0
+        (int)BOARD_GPIO_READ(ACTIVE.button, BUTTON_PORT, BUTTON_PIN)?1:0,
+        (int)BOARD_GPIO_READ(ACTIVE.charger, CHARGER_PORT, CHARGER_PIN)?1:0
     );
     return 1;
 }
@@ -605,12 +608,31 @@ int line_test_message(PROTOCOL_STAT *s, char *cmd, char *ascii_out) {
 
 int line_reset_firmware(PROTOCOL_STAT *s, char *cmd, char *ascii_out) {
 //case 'R':
-    if (cmd[1] == '!'){
+    if (cmd[1] == '!') {
+        /* R! — plain reset; stays in application on next boot */
         sprintf(ascii_out, "\r\n!!!!!Resetting!!!!!\r\n");
         s->send_serial_data_wait((unsigned char *)ascii_out, strlen(ascii_out));
         ascii_out[0] = 0;
         HAL_Delay(500);
         HAL_NVIC_SystemReset();
+    } else if (cmd[1] == 'B' || cmd[1] == 'b') {
+        /* RB — reset INTO our CAN+UART bootloader (30 s window) */
+        sprintf(ascii_out, "\r\nRebooting into bootloader (30s window) ...\r\n");
+        s->send_serial_data_wait((unsigned char *)ascii_out, strlen(ascii_out));
+        ascii_out[0] = 0;
+        HAL_Delay(200);
+        bootloader_request_reset();
+    } else if (cmd[1] == 'D' || cmd[1] == 'd') {
+        /* RD — reset into STM32 ROM DFU bootloader (USB, VID_0483:PID_DF11).
+         * Fixes Windows "DEVICE_DESCRIPTOR_FAILURE" / VID_0000:PID_0002 error.
+         * Use STM32CubeProgrammer or dfu-util to flash via USB after this.
+         * Only works on boards that have USB connected to PA11/PA12. */
+        sprintf(ascii_out, "\r\nEntering USB DFU mode (VID_0483:PID_DF11) ...\r\n"
+                "Install STM32CubeProgrammer on Windows or use dfu-util.\r\n");
+        s->send_serial_data_wait((unsigned char *)ascii_out, strlen(ascii_out));
+        ascii_out[0] = 0;
+        HAL_Delay(200);
+        bootloader_request_dfu();
     }
     return 1;
 }
@@ -647,6 +669,87 @@ int line_read_memory(PROTOCOL_STAT *s, char *cmd, char *ascii_out) {
 
 
 
+/* =========================================================================
+ * PhaseMap Wizard — ASCII serial interface
+ *
+ * Registered as command 'V' (mnemonic: Wizard).
+ * The ascii_cmd buffer in ASCIISTATE is 20 bytes; the longest subcommand
+ * we need is "Vstart guided" (13 chars including the leading 'V').
+ *
+ * Subcommands (all starting with 'V'):
+ *   Vstart g[uided]  — phasemap_start(PM_MODE_GUIDED)
+ *   Vstart a[uto]    — phasemap_start(PM_MODE_AUTO_ADC)
+ *   Vabort           — phasemap_abort()
+ *   Vstatus          — print state + probe index
+ *
+ * Single-char interactive input (y/n/s/q) during an active wizard session
+ * is handled by main.c routing individual received bytes to phasemap_char().
+ * This function handles the line-command dispatch only.
+ * ======================================================================= */
+int line_phasemap(PROTOCOL_STAT *s, char *cmd, char *ascii_out)
+{
+    /* cmd[0] == 'V' or 'v'; subcommand starts at cmd[1] */
+    const char *sub = cmd + 1;
+
+    /* Skip optional leading space */
+    while (*sub == ' ') sub++;
+
+    /* Dispatch on first letter of subcommand:
+     *   's' -> could be "start ..." or "status"
+     *   'a' -> "abort"
+     *   anything else -> help
+     */
+    if ((sub[0] == 's' || sub[0] == 'S') &&
+        (sub[1] == 't' || sub[1] == 'T') &&
+        (sub[2] == 'a' || sub[2] == 'A') &&
+        (sub[3] == 'r' || sub[3] == 'R')) {
+        /* "start ..." — skip "start" and optional space */
+        const char *arg = sub + 5;
+        while (*arg == ' ') arg++;
+        if (arg[0] == 'g' || arg[0] == 'G') {
+            phasemap_start(PM_MODE_GUIDED);
+            sprintf(ascii_out, "[PhaseMap] Wizard started (GUIDED mode).\r\n");
+        } else if (arg[0] == 'a' || arg[0] == 'A') {
+            phasemap_start(PM_MODE_AUTO_ADC);
+            sprintf(ascii_out, "[PhaseMap] Wizard started (AUTO_ADC mode).\r\n");
+        } else {
+            sprintf(ascii_out,
+                "[PhaseMap] Usage: Vstart g  (guided)\r\n"
+                "                  Vstart a  (auto ADC)\r\n");
+        }
+    } else if ((sub[0] == 's' || sub[0] == 'S') &&
+               (sub[1] == 't' || sub[1] == 'T') &&
+               (sub[2] == 'a' || sub[2] == 'A') &&
+               (sub[3] == 't' || sub[3] == 'T')) {
+        /* "status" */
+        static const char * const state_names[] = {
+            "IDLE", "SAFETY_GATE", "SCAN_ADC", "PROBE_LOWSIDE",
+            "PROBE_HALL", "BUILD_PROFILE", "DONE", "ABORTED"
+        };
+        pm_state_t st = phasemap_state();
+        int st_idx = (int)st;
+        if (st_idx < 0 || st_idx > 7) st_idx = 0;
+        sprintf(ascii_out,
+            "[PhaseMap] State: %s  confirmed_probes=%u\r\n",
+            state_names[st_idx],
+            (unsigned)phasemap_confirmed_count());
+    } else if (sub[0] == 'a' || sub[0] == 'A') {
+        /* "abort" */
+        phasemap_abort();
+        sprintf(ascii_out, "[PhaseMap] Aborted.\r\n");
+    } else {
+        /* Help */
+        sprintf(ascii_out,
+            "[PhaseMap] Wizard commands (prefix V):\r\n"
+            "  Vstart g  - start GUIDED mode (operator confirms y/n per pin)\r\n"
+            "  Vstart a  - start AUTO_ADC mode (uses battery droop)\r\n"
+            "  Vabort    - emergency stop, drives all gate pins LOW\r\n"
+            "  Vstatus   - show wizard state and confirmed-probe count\r\n"
+            "  During probe: type y/n to confirm/reject, s=skip, q=abort\r\n");
+    }
+    return 1;
+}
+
 /////////////////////////////////////////////
 // single byte commands at start of command
 // - i.e. only after CR of LF and ascii buffer empty
@@ -671,7 +774,7 @@ int main_ascii_init(PROTOCOL_STAT *s){
     ascii_add_line_fn( 'S', line_main_timing_stats, "show main loop timing stats");
     ascii_add_line_fn( 'E', line_debug_control, "dEbug control, E->off, Ec->console on, Es->console+scope");
 
-    ascii_add_line_fn( 'R', line_reset_firmware, " - R! -> Reset Firmware");
+    ascii_add_line_fn( 'R', line_reset_firmware, " - R! Reset  RB -> Bootloader (30s)  RD -> USB DFU (VID_0483:PID_DF11)");
     ascii_add_line_fn( 'T', line_test_message, "tt - send a test protocol message ");
     ascii_add_line_fn( 'P', line_poweroff_control, " P -power control\r\n"
                 "  P -disablepoweroff\r\n"
@@ -687,6 +790,12 @@ int main_ascii_init(PROTOCOL_STAT *s){
     ascii_add_line_fn( 'G', line_stm32, "display stm32 specific");
 
     ascii_add_line_fn( 'F', line_generic_var, get_F_description(s));
+
+    /* PhaseMap Wizard — 'V' for Wizard.
+     * Interactive chars (y/n/s/q) during an active session are routed via
+     * phasemap_char() in main.c's receive loop, not through this function. */
+    ascii_add_line_fn( 'V', line_phasemap,
+        "PhaseMap Wizard: Vstart g/a, Vabort, Vstatus");
 
     return 1;
 }

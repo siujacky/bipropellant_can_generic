@@ -21,6 +21,7 @@
 #include "config.h"
 #include "control_structures.h"
 #include "defines.h"
+#include "board_active.h"
 
 typedef struct tag_time_stats {
     // times
@@ -59,7 +60,13 @@ typedef struct tag_time_stats {
 
 extern TIME_STATS timeStats;
 
-#define HALL_PIN_MASK (LEFT_HALL_U_PIN | LEFT_HALL_V_PIN | LEFT_HALL_W_PIN | RIGHT_HALL_U_PIN | RIGHT_HALL_V_PIN | RIGHT_HALL_W_PIN)
+#define HALL_PIN_MASK ( \
+    BOARD_GP_MASK(ACTIVE.halls_left.hall_a,  LEFT_HALL_U_PIN)  | \
+    BOARD_GP_MASK(ACTIVE.halls_left.hall_b,  LEFT_HALL_V_PIN)  | \
+    BOARD_GP_MASK(ACTIVE.halls_left.hall_c,  LEFT_HALL_W_PIN)  | \
+    BOARD_GP_MASK(ACTIVE.halls_right.hall_a, RIGHT_HALL_U_PIN) | \
+    BOARD_GP_MASK(ACTIVE.halls_right.hall_b, RIGHT_HALL_V_PIN) | \
+    BOARD_GP_MASK(ACTIVE.halls_right.hall_c, RIGHT_HALL_W_PIN))
 
 //////////////////////////////////////////////////////////////
 // change to change speed output value

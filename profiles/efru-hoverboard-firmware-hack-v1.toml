@@ -1,0 +1,75 @@
+# Captured from EFeru's hoverboard-firmware-hack (BOARD_VARIANT == 1)
+# Source: https://github.com/RoboDurden/hoverboard-firmware-hack (master branch defines.h)
+# Alternate pinout for the same hoverboard hack — different DCLINK/BUZZER/OFF/BUTTON/CHARGER pins.
+
+[meta]
+name = "EFeru hoverboard-firmware-hack BOARD_VARIANT_1"
+source = "imported-from-RoboDurden/hoverboard-firmware-hack"
+notes = "Alternative pinout variant. Hall + phase pins identical to v0, IO pins shifted."
+confidence = 1.0
+
+[chip]
+family = "STM32F1"
+part_hint = "STM32F103RCT6"
+
+[power]
+self_hold = "PC15"
+self_hold_active_high = true
+
+[halls_left]
+hall_a = "PB5"
+hall_b = "PB6"
+hall_c = "PB7"
+
+[halls_right]
+hall_a = "PC10"
+hall_b = "PC11"
+hall_c = "PC12"
+
+[phases_left]
+timer = "TIM8"
+u_high = "PC6"
+u_low = "PA7"
+v_high = "PC7"
+v_low = "PB0"
+w_high = "PC8"
+w_low = "PB1"
+dead_time_ns = 1000
+
+[phases_right]
+timer = "TIM1"
+u_high = "PA8"
+u_low = "PB13"
+v_high = "PA9"
+v_low = "PB14"
+w_high = "PA10"
+w_low = "PB15"
+dead_time_ns = 1000
+
+[indicators]
+led_green = "PB2"
+buzzer = "PC13"
+
+[inputs]
+button = "PB9"
+button_active_low = false
+charger_detect = "PA11"
+charger_active_low = false
+
+[sensing.battery_voltage]
+adc_unit = 1
+channel = 1
+on_pin = { port = "A", pin = 1 }
+divider = 13.0
+
+[sensing.left_phase_current]
+adc_unit = 1
+channel = 10
+on_pin = { port = "C", pin = 0 }
+shunt_resistor_milliohms = 1.0
+
+[sensing.right_phase_current]
+adc_unit = 1
+channel = 11
+on_pin = { port = "C", pin = 1 }
+shunt_resistor_milliohms = 1.0

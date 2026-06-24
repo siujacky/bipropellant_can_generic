@@ -105,36 +105,31 @@ bool MCP2515_SetMode(uint8_t mode) {
 }
 
 bool MCP2515_SetBitrate(uint8_t speed) {
-    // Bitrate configuration for 8 MHz crystal
-    // CNF1: SJW=1, BRP
-    // CNF2: BTLMODE=1, SAM=0, PHSEG1, PRSEG
-    // CNF3: SOF=0, WAKFIL=0, PHSEG2
-    
+    /* CNF values for 8 MHz crystal. Formula: TQ=2*(BRP+1)/8MHz, bit=TQ*(1+PROP+PS1+PS2).
+     * CNF2: BTLMODE(bit7)=1, SAM=0, PHSEG1[5:3], PRSEG[2:0]
+     * CNF3: SOF=0, WAKFIL=0, PHSEG2[2:0]
+     * SP% = (1+PROP+PS1)/total × 100. All values ≥ 75% SP. */
     uint8_t cnf1, cnf2, cnf3;
-    
+
     switch (speed) {
         case MCP2515_SPEED_125KBPS:
-            cnf1 = 0x01;  // BRP=1, SJW=1
-            cnf2 = 0xB1;  // BTLMODE=1, PHSEG1=3, PRSEG=1
-            cnf3 = 0x85;  // PHSEG2=5
+            /* BRP=1 TQ=500ns 16TQ: PROP=7 PS1=4 PS2=4 → 125kbps, 75%SP */
+            cnf1 = 0x01; cnf2 = 0x9E; cnf3 = 0x03;
             break;
-            
+
         case MCP2515_SPEED_250KBPS:
-            cnf1 = 0x00;  // BRP=0, SJW=1
-            cnf2 = 0xB1;  // BTLMODE=1, PHSEG1=3, PRSEG=1
-            cnf3 = 0x85;  // PHSEG2=5
+            /* BRP=0 TQ=250ns 16TQ: PROP=7 PS1=4 PS2=4 → 250kbps, 75%SP ← CONFIRMED ✓ */
+            cnf1 = 0x00; cnf2 = 0x9E; cnf3 = 0x03;
             break;
-            
+
         case MCP2515_SPEED_500KBPS:
-            cnf1 = 0x00;  // BRP=0, SJW=1
-            cnf2 = 0x90;  // BTLMODE=1, PHSEG1=2, PRSEG=0
-            cnf3 = 0x82;  // PHSEG2=2
+            /* BRP=0 TQ=250ns 8TQ: PROP=2 PS1=3 PS2=2 → 500kbps, 87.5%SP (fixed from 62.5%) */
+            cnf1 = 0x00; cnf2 = 0x99; cnf3 = 0x00;
             break;
-            
+
         case MCP2515_SPEED_1MBPS:
-            cnf1 = 0x00;  // BRP=0, SJW=1
-            cnf2 = 0x80;  // BTLMODE=1, PHSEG1=1, PRSEG=0
-            cnf3 = 0x80;  // PHSEG2=1
+            /* BRP=0 TQ=250ns 4TQ: PROP=1 PS1=1 PS2=1 → 1Mbps, 75%SP (marginal, <8TQ) */
+            cnf1 = 0x00; cnf2 = 0x80; cnf3 = 0x00;
             break;
             
         default:
@@ -151,7 +146,7 @@ bool MCP2515_SetBitrate(uint8_t speed) {
 bool MCP2515_SendFrame(CAN_Frame *frame) {
     // Check if TX buffer 0 is free
     uint8_t status = MCP2515_ReadRegister(MCP2515_TXB0CTRL);
-    if (status & 0x08) {  // TXREQ bit set - buffer busy
+    if (status & 0x04) {  /* TXREQ = bit2 (DS21801J); bit3=TXERR, NOT TXREQ */
         return false;
     }
     

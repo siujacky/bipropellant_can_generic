@@ -108,6 +108,12 @@ LoopFillZerobss:
   cmp r2, r3
   bcc FillZerobss
 
+/* Relocate vector table to application base so NVIC works correctly
+ * when the bootloader jumps here (SCB_VTOR = 0xE000ED08). */
+    LDR  r0, =0x08002000
+    LDR  r1, =0xE000ED08    @ SCB_VTOR address
+    STR  r0, [r1]
+
 /* Call the clock system intitialization function.*/
     bl  SystemInit
 /* Call static constructors */

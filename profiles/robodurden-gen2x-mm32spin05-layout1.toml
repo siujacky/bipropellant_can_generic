@@ -1,0 +1,57 @@
+# Captured from RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32 (TARGET=4, LAYOUT=1)
+# Source: defines_2-4-1.h
+# MM32SPIN05 — Chinese clone of STM32 used in some hoverboards.
+# HALL_B not defined in the source (marked TODO_PIN). Verify against PCB.
+
+[meta]
+name = "RoboDurden Gen2.x MM32SPIN05 LAYOUT 1 (Chinese STM32 clone)"
+source = "imported-from-RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32"
+notes = "MM32SPIN05 target. HALL_B was TODO_PIN in source — left blank, requires discovery. CHARGE_STATE on PF0."
+confidence = 0.85
+
+[chip]
+family = "MM32SPIN0X"
+part_hint = "MM32SPIN05PF"
+
+[power]
+self_hold = "PB2"
+self_hold_active_high = true
+
+[halls_right]
+hall_a = "PB11"
+# hall_b intentionally omitted — was TODO_PIN in source, needs runtime discovery
+hall_c = "PC14"
+
+[phases_right]
+timer = "TIMER0"
+u_high = "PA8"
+u_low = "PB13"
+v_high = "PA9"
+v_low = "PB14"
+w_high = "PA10"
+w_low = "PB15"
+dead_time_ns = 833
+
+[indicators]
+led_green = "PA15"
+led_red = "PB3"
+led_orange = "PA12"
+buzzer = "PB10"
+
+[inputs]
+button = "PC15"
+button_active_low = true
+charger_detect = "PF0"
+charger_active_low = true
+
+[sensing.battery_voltage]
+adc_unit = 1
+channel = 4
+on_pin = { port = "A", pin = 4 }
+divider = 13.0
+
+[sensing.left_phase_current]
+adc_unit = 1
+channel = 6
+on_pin = { port = "A", pin = 6 }
+shunt_resistor_milliohms = 1.0

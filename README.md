@@ -1,6 +1,61 @@
 ![Bipropellant](.github/logo.png)
 
-# Bipropellant Hoverboard Firmware - CAN Bus Edition
+# bipropellant_can_generic — board-generic hoverboard firmware
+
+**A fork of [bipropellant_can](https://github.com/siujacky/bipropellant_can) (itself a fork of
+[bipropellant-hoverboard-firmware](https://github.com/bipropellant/bipropellant-hoverboard-firmware) + MCP2515 CAN)
+that makes the firmware *board-generic*: one binary per STM32 family that works across many hoverboard
+mainboards, with pin maps supplied by [stm32_auto_detect](https://github.com/siujacky/stm32_auto_detect) profiles.**
+
+Hoverboard mainboards use a handful of MCU families (STM32F103, GD32F1x0/E2, MM32, AT32) but every brand wires
+the GPIOs differently. Instead of hand-editing `defines.h` per board, this firmware **embeds the whole profile
+library** as a generated board table, **selects one active profile at boot**, and lets you **override individual
+pins at runtime** (persisted to NVRAM) — within what the silicon allows.
+
+## How it works
+
+```
+stm32_auto_detect          codegen/ (this repo)              firmware
+  discovers a board   ->    profiles/*.toml  --c_board_table-->  board_table_<family>.c   ->  one .bin per family
+  (or import defines.h)     af_tables/*.json                     (embedded const table)       embeds ALL family boards
+```
+
+At boot: `board_select` resolves ONE profile into a mutable RAM `ACTIVE` (stored index / serial-forced; falls back
+to a **motor-disabled safe default**). Every pin read/write sources from `ACTIVE`. `board_override` lets you remap a
+pin at runtime via serial/CAN, gated by three validators (silicon legality, profile-wide uniqueness, EXTI-line) and
+routed **live** for GPIO-class pins or **applied-on-reboot** for silicon-bound pins (phase PWM / ADC / hall).
+
+> **Pin-binding reality:** phase-PWM (TIM1/TIM8 complementary channels), ADC channels and hall EXTI lines are
+> silicon-bound — those overrides are validated, persisted, and applied on the next reboot, never live. GPIO-class
+> pins (LED/buzzer/button/charger/CAN soft-SPI) re-init live. The firmware returns explicit
+> `APPLIED_LIVE / PENDING_REBOOT / REJECTED_SILICON / REJECTED_CONFLICT / REJECTED_EXTI` and never lies about it.
+> Board *auto-detect* is not possible from silicon alone (no per-board UID), so selection is an explicit choice.
+
+## Build (STM32F1 family)
+
+```bash
+python -m codegen.emit_board_table --all-families --profiles profiles --out generated   # regenerate board tables
+make                                                                                     # -> build/hover.{elf,bin}
+python -m pytest codegen/tests/                                                          # codegen unit tests
+```
+
+Requires `arm-none-eabi-gcc` (≥10; the Makefile sets `-fcommon`). Flash `build/hover.bin` to `0x8000000`.
+
+## Status
+
+| Milestone | State |
+|---|---|
+| M1 codegen (TOML → C board table, all 4 families) | ✅ 12/12 tests, generated C `gcc`-clean |
+| M2 runtime `ACTIVE` pins (STM32F1) | ✅ builds; safe-default = byte-for-byte baseline |
+| M3 boot board selection | ✅ |
+| M4 NVRAM override + 3 validators | ✅ adversarially reviewed |
+| M5–M7 GD32F130 / GD32E230 / MM32 + GPL vendor libs | ⏳ needs real silicon |
+
+See [`docs/PLAN.md`](docs/PLAN.md) for the full design, risks, and milestones. GPL-3.0 (inherited from upstream).
+
+---
+
+<details><summary>Upstream bipropellant_can (CAN Bus Edition) README</summary>
 
 **A fork of the [bipropellant-hoverboard-firmware](https://github.com/bipropellant/bipropellant-hoverboard-firmware) with MCP2515 CAN bus support for multi-board RC vehicle control.**
 
@@ -271,3 +326,5 @@ pio run -e CAN_BUS_board1  # Rear board
 ## License
 
 See original [bipropellant-hoverboard-firmware](https://github.com/bipropellant/bipropellant-hoverboard-firmware) for license information.
+
+</details>

@@ -1,0 +1,49 @@
+# Captured from RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32 (TARGET=1, LAYOUT=3)
+# Source: defines_2-1-3.h
+# GD32F130 with alternate phase low-side routing (PA7/PB0/PB1 instead of PB13-15).
+# Likely a smaller package variant where PB13-15 aren't available.
+
+[meta]
+name = "RoboDurden Gen2.x-GD32 LAYOUT 1-3 (GD32F130 small-package)"
+source = "imported-from-RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32"
+notes = "Phase LOW side routed to PA7/PB0/PB1 (TIM1 channels CH1N/CH2N/CH3N alternate pins). Hall pins on PB8/PA12/PB3. SELF_HOLD and VBATT both reference PA1 in headers — kept SELF_HOLD."
+confidence = 0.9
+
+[chip]
+family = "GD32F1"
+part_hint = "GD32F130C4T6 / GD32F130F6"
+
+[power]
+self_hold = "PA1"
+self_hold_active_high = true
+
+[halls_right]
+hall_a = "PB8"
+hall_b = "PA12"
+hall_c = "PB3"
+
+[phases_right]
+timer = "TIMER0"
+u_high = "PA10"
+u_low = "PB1"
+v_high = "PA9"
+v_low = "PB0"
+w_high = "PA8"
+w_low = "PA7"
+dead_time_ns = 833
+
+[indicators]
+led_red = "PF1"
+buzzer = "PA11"
+
+[inputs]
+button = "PB2"
+button_active_low = true
+charger_detect = "PF0"
+charger_active_low = true
+
+[sensing.left_phase_current]
+adc_unit = 1
+channel = 3
+on_pin = { port = "A", pin = 3 }
+shunt_resistor_milliohms = 1.0

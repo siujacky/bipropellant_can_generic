@@ -1,0 +1,220 @@
+
+Discarded input sections
+
+ .text          0x00000000        0x0 startup_bl.o
+ .data          0x00000000        0x0 startup_bl.o
+ .bss           0x00000000        0x0 startup_bl.o
+ .text          0x00000000        0x0 bxcan_bl.o
+ .data          0x00000000        0x0 bxcan_bl.o
+ .bss           0x00000000        0x0 bxcan_bl.o
+ .comment       0x00000000       0x27 bxcan_bl.o
+ .text          0x00000000        0x0 usart_bl.o
+ .data          0x00000000        0x0 usart_bl.o
+ .bss           0x00000000        0x0 usart_bl.o
+ .text.usart_init_hdsel
+                0x00000000       0x48 usart_bl.o
+ .text.usart_tx
+                0x00000000       0x16 usart_bl.o
+ .text.usart_init_autodetect
+                0x00000000       0x58 usart_bl.o
+ .text.usart_tx_verify
+                0x00000000       0x38 usart_bl.o
+ .comment       0x00000000       0x27 usart_bl.o
+ .text          0x00000000        0x0 flash_bl.o
+ .data          0x00000000        0x0 flash_bl.o
+ .bss           0x00000000        0x0 flash_bl.o
+ .text.flash_erase_page
+                0x00000000       0x10 flash_bl.o
+ .comment       0x00000000       0x27 flash_bl.o
+ .text          0x00000000        0x0 main_bl.o
+ .data          0x00000000        0x0 main_bl.o
+ .bss           0x00000000        0x0 main_bl.o
+ .comment       0x00000000       0x27 main_bl.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+FLASH            0x08000000         0x00002000         xr
+RAM              0x20000000         0x00001000         xrw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD startup_bl.o
+LOAD bxcan_bl.o
+LOAD usart_bl.o
+LOAD flash_bl.o
+LOAD main_bl.o
+                0x20001000                        _estack = (ORIGIN (RAM) + LENGTH (RAM))
+
+.text           0x08000000     0x148c
+ *(.isr_vector)
+ .isr_vector    0x08000000       0x40 startup_bl.o
+ *(.text)
+ *(.text.*)
+ .text.Reset_Handler
+                0x08000040       0x40 startup_bl.o
+                0x08000040                Reset_Handler
+ .text.bxcan_init
+                0x08000080       0xd8 bxcan_bl.o
+                0x08000080                bxcan_init
+ .text.bxcan_tx
+                0x08000158       0x98 bxcan_bl.o
+                0x08000158                bxcan_tx
+ .text.bxcan_rx
+                0x080001f0       0x84 bxcan_bl.o
+                0x080001f0                bxcan_rx
+ .text.usart_init
+                0x08000274       0x4c usart_bl.o
+                0x08000274                usart_init
+ .text.usart_rx_ready
+                0x080002c0       0x10 usart_bl.o
+                0x080002c0                usart_rx_ready
+ .text.usart_rx_byte
+                0x080002d0       0x18 usart_bl.o
+                0x080002d0                usart_rx_byte
+ .text.usart_tx_byte
+                0x080002e8       0x14 usart_bl.o
+                0x080002e8                usart_tx_byte
+ .text.usart_rx_buf
+                0x080002fc       0x40 usart_bl.o
+                0x080002fc                usart_rx_buf
+ .text.usart_print
+                0x0800033c       0x12 usart_bl.o
+                0x0800033c                usart_print
+ *fill*         0x0800034e        0x2 
+ .text.usart_print_hex32
+                0x08000350       0x24 usart_bl.o
+                0x08000350                usart_print_hex32
+ .text.usart_print_uint32
+                0x08000374       0x44 usart_bl.o
+                0x08000374                usart_print_uint32
+ .text.flash_wait
+                0x080003b8       0x10 flash_bl.o
+ .text.flash_erase_hw_page
+                0x080003c8       0x38 flash_bl.o
+ .text.flash_unlock
+                0x08000400       0x1c flash_bl.o
+                0x08000400                flash_unlock
+ .text.flash_lock
+                0x0800041c       0x1c flash_bl.o
+                0x0800041c                flash_lock
+ .text.flash_erase_page_any
+                0x08000438        0x4 flash_bl.o
+                0x08000438                flash_erase_page_any
+ .text.flash_erase_region
+                0x0800043c       0x1e flash_bl.o
+                0x0800043c                flash_erase_region
+ *fill*         0x0800045a        0x2 
+ .text.flash_write_halfword
+                0x0800045c       0x24 flash_bl.o
+                0x0800045c                flash_write_halfword
+ .text.flash_write_page_impl
+                0x08000480       0x58 flash_bl.o
+ .text.flash_write_page
+                0x080004d8        0x6 flash_bl.o
+                0x080004d8                flash_write_page
+ .text.flash_write_page_any
+                0x080004de        0x6 flash_bl.o
+                0x080004de                flash_write_page_any
+ .text.delay_ms
+                0x080004e4       0x1c main_bl.o
+ .text.bl_broadcast_status
+                0x08000500       0xcc main_bl.o
+ .text.enter_rom_dfu
+                0x080005cc       0xec main_bl.o
+ .text.jump_to_app_at
+                0x080006b8       0x24 main_bl.o
+ .text.jump_to_slot
+                0x080006dc       0x1c main_bl.o
+ .text.send_byte
+                0x080006f8       0x2c main_bl.o
+ .text.ctrl_respond.constprop.0
+                0x08000724       0x38 main_bl.o
+ .text.bl_config_write.constprop.0
+                0x0800075c       0x5c main_bl.o
+ .text.crc32_page.constprop.0
+                0x080007b8       0x4c main_bl.o
+ .text.uart_do_upload
+                0x08000804       0xb8 main_bl.o
+ .text.startup.main
+                0x080008bc      0x788 main_bl.o
+                0x080008bc                main
+ *(.rodata)
+ *(.rodata.*)
+ .rodata.hex.0  0x08001044       0x11 usart_bl.o
+ .rodata.main.str1.1
+                0x08001055      0x436 main_bl.o
+                                0x439 (size before relaxing)
+                0x0800148c                        . = ALIGN (0x4)
+ *fill*         0x0800148b        0x1 
+                0x0800148c                        _etext = .
+
+.glue_7         0x0800148c        0x0
+ .glue_7        0x0800148c        0x0 linker stubs
+
+.glue_7t        0x0800148c        0x0
+ .glue_7t       0x0800148c        0x0 linker stubs
+
+.vfp11_veneer   0x0800148c        0x0
+ .vfp11_veneer  0x0800148c        0x0 linker stubs
+
+.v4_bx          0x0800148c        0x0
+ .v4_bx         0x0800148c        0x0 linker stubs
+
+.iplt           0x0800148c        0x0
+ .iplt          0x0800148c        0x0 startup_bl.o
+
+.rel.dyn        0x0800148c        0x0
+ .rel.iplt      0x0800148c        0x0 startup_bl.o
+
+.data           0x20000000        0x8 load address 0x0800148c
+                0x20000000                        _sdata = .
+ *(.data)
+ *(.data.*)
+ .data.s_last_erased_page
+                0x20000000        0x4 flash_bl.o
+ .data.g_upload_target
+                0x20000004        0x4 main_bl.o
+                0x20000008                        . = ALIGN (0x4)
+                0x20000008                        _edata = .
+                0x0800148c                        _ldata = LOADADDR (.data)
+
+.igot.plt       0x20000008        0x0 load address 0x08001494
+ .igot.plt      0x20000008        0x0 startup_bl.o
+
+.bss            0x20000008      0x424 load address 0x08001494
+                0x20000008                        _sbss = .
+ *(.bss)
+ *(.bss.*)
+ .bss.page_buf  0x20000008      0x400 main_bl.o
+ .bss.g_transport
+                0x20000408        0x1 main_bl.o
+ .bss.g_upload_target_slot
+                0x20000409        0x1 main_bl.o
+ *fill*         0x2000040a        0x2 
+ .bss.g_config  0x2000040c       0x20 main_bl.o
+ *(COMMON)
+                0x2000042c                        . = ALIGN (0x4)
+                0x2000042c                        _ebss = .
+
+/DISCARD/
+ *(.ARM.exidx*)
+ *(.ARM.extab*)
+ *(.eh_frame*)
+ *(.comment)
+OUTPUT(bootloader.elf elf32-littlearm)
+LOAD linker stubs
+
+.ARM.attributes
+                0x00000000       0x2f
+ .ARM.attributes
+                0x00000000       0x21 startup_bl.o
+ .ARM.attributes
+                0x00000021       0x2d bxcan_bl.o
+ .ARM.attributes
+                0x0000004e       0x2d usart_bl.o
+ .ARM.attributes
+                0x0000007b       0x2d flash_bl.o
+ .ARM.attributes
+                0x000000a8       0x2d main_bl.o

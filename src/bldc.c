@@ -1,6 +1,7 @@
 
 #include "stm32f1xx_hal.h"
 #include "defines.h"
+#include "board_active.h"
 #include "setup.h"
 #include "config.h"
 #include "bldc.h"
@@ -32,8 +33,6 @@ RT_MODEL rtM_Left_;    /* Real-time model */
 RT_MODEL rtM_Right_;   /* Real-time model */
 RT_MODEL *const rtM_Left = &rtM_Left_;
 RT_MODEL *const rtM_Right = &rtM_Right_;
-
-P rtP;                           /* Block parameters (auto storage) */
 
 DW rtDW_Left;                    /* Observable states */
 ExtU rtU_Left;                   /* External inputs */
@@ -171,8 +170,8 @@ void DMA1_Channel1_IRQHandler() {
   uint32_t time_in = DWT->CYCCNT;
 
   __disable_irq(); // but we want both values at the same time, without interferance
-  hall[0] = (~(LEFT_HALL_U_PORT->IDR & (LEFT_HALL_U_PIN | LEFT_HALL_V_PIN | LEFT_HALL_W_PIN))/LEFT_HALL_U_PIN) & 7;
-  hall[1] = (~(RIGHT_HALL_U_PORT->IDR & (RIGHT_HALL_U_PIN | RIGHT_HALL_V_PIN | RIGHT_HALL_W_PIN))/RIGHT_HALL_U_PIN) & 7;
+  hall[0] = (~(BOARD_GP_PORT(ACTIVE.halls_left.hall_a, LEFT_HALL_U_PORT)->IDR & (BOARD_GP_MASK(ACTIVE.halls_left.hall_a, LEFT_HALL_U_PIN) | BOARD_GP_MASK(ACTIVE.halls_left.hall_b, LEFT_HALL_V_PIN) | BOARD_GP_MASK(ACTIVE.halls_left.hall_c, LEFT_HALL_W_PIN)))/BOARD_GP_MASK(ACTIVE.halls_left.hall_a, LEFT_HALL_U_PIN)) & 7;
+  hall[1] = (~(BOARD_GP_PORT(ACTIVE.halls_right.hall_a, RIGHT_HALL_U_PORT)->IDR & (BOARD_GP_MASK(ACTIVE.halls_right.hall_a, RIGHT_HALL_U_PIN) | BOARD_GP_MASK(ACTIVE.halls_right.hall_b, RIGHT_HALL_V_PIN) | BOARD_GP_MASK(ACTIVE.halls_right.hall_c, RIGHT_HALL_W_PIN)))/BOARD_GP_MASK(ACTIVE.halls_right.hall_a, RIGHT_HALL_U_PIN)) & 7;
   __enable_irq();
 
   DMA1->IFCR = DMA_IFCR_CTCIF1;
@@ -205,10 +204,12 @@ void DMA1_Channel1_IRQHandler() {
   buzzerTimer++;
   if (buzzerFreq != 0 && (buzzerTimer / 5000) % (buzzerPattern + 1) == 0) {
     if (buzzerTimer % buzzerFreq == 0) {
-      HAL_GPIO_TogglePin(BUZZER_PORT, BUZZER_PIN);
+      HAL_GPIO_TogglePin(BOARD_GP_PORT(ACTIVE.buzzer, BUZZER_PORT),
+                         BOARD_GP_MASK(ACTIVE.buzzer, BUZZER_PIN));
     }
   } else {
-      HAL_GPIO_WritePin(BUZZER_PORT, BUZZER_PIN, 0);
+      HAL_GPIO_WritePin(BOARD_GP_PORT(ACTIVE.buzzer, BUZZER_PORT),
+                        BOARD_GP_MASK(ACTIVE.buzzer, BUZZER_PIN), 0);
   }
 
   // reduce to 8khz by running every other interrupt.

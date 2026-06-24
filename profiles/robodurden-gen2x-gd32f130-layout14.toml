@@ -1,0 +1,56 @@
+# Captured from RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32 (TARGET=1, LAYOUT=14)
+# Source: defines_2-1-14.h
+# GD32F130 LAYOUT 14 — Halls on PA0/PA1/PB11.
+
+[meta]
+name = "RoboDurden Gen2.x-GD32 LAYOUT 1-14"
+source = "imported-from-RoboDurden/Hoverboard-Firmware-Hack-Gen2.x-GD32"
+notes = "Hall A/B on PA0/PA1 (analog-capable pins used as digital), HALL_C on PB11."
+confidence = 1.0
+
+[chip]
+family = "GD32F1"
+part_hint = "GD32F130C8T6"
+
+[power]
+self_hold = "PB2"
+self_hold_active_high = true
+
+[halls_right]
+hall_a = "PA0"
+hall_b = "PA1"
+hall_c = "PB11"
+
+[phases_right]
+timer = "TIMER0"
+u_high = "PA8"
+u_low = "PB13"
+v_high = "PA9"
+v_low = "PB14"
+w_high = "PA10"
+w_low = "PB15"
+dead_time_ns = 833
+
+[indicators]
+led_green = "PA15"
+led_red = "PB4"
+led_orange = "PB3"
+buzzer = "PB9"
+
+[inputs]
+button = "PC15"
+button_active_low = true
+charger_detect = "PF0"
+charger_active_low = true
+
+[sensing.battery_voltage]
+adc_unit = 1
+channel = 4
+on_pin = { port = "A", pin = 4 }
+divider = 13.0
+
+[sensing.left_phase_current]
+adc_unit = 1
+channel = 6
+on_pin = { port = "A", pin = 6 }
+shunt_resistor_milliohms = 1.0
