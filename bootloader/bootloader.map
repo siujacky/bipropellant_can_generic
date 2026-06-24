@@ -45,7 +45,7 @@ LOAD flash_bl.o
 LOAD main_bl.o
                 0x20001000                        _estack = (ORIGIN (RAM) + LENGTH (RAM))
 
-.text           0x08000000     0x1300
+.text           0x08000000     0x1334
  *(.isr_vector)
  .isr_vector    0x08000000       0x40 startup_bl.o
  *(.text)
@@ -129,37 +129,37 @@ LOAD main_bl.o
  .text.uart_do_upload
                 0x080008ac       0xbc main_bl.o
  .text.startup.main
-                0x08000968      0x678 main_bl.o
+                0x08000968      0x6ac main_bl.o
                 0x08000968                main
  *(.rodata)
  *(.rodata.*)
- .rodata.hex.0  0x08000fe0       0x11 usart_bl.o
- *fill*         0x08000ff1        0x3 
+ .rodata.hex.0  0x08001014       0x11 usart_bl.o
+ *fill*         0x08001025        0x3 
  .rodata.main.str1.4
-                0x08000ff4      0x30b main_bl.o
-                0x08001300                        . = ALIGN (0x4)
- *fill*         0x080012ff        0x1 
-                0x08001300                        _etext = .
+                0x08001028      0x30b main_bl.o
+                0x08001334                        . = ALIGN (0x4)
+ *fill*         0x08001333        0x1 
+                0x08001334                        _etext = .
 
-.glue_7         0x08001300        0x0
- .glue_7        0x08001300        0x0 linker stubs
+.glue_7         0x08001334        0x0
+ .glue_7        0x08001334        0x0 linker stubs
 
-.glue_7t        0x08001300        0x0
- .glue_7t       0x08001300        0x0 linker stubs
+.glue_7t        0x08001334        0x0
+ .glue_7t       0x08001334        0x0 linker stubs
 
-.vfp11_veneer   0x08001300        0x0
- .vfp11_veneer  0x08001300        0x0 linker stubs
+.vfp11_veneer   0x08001334        0x0
+ .vfp11_veneer  0x08001334        0x0 linker stubs
 
-.v4_bx          0x08001300        0x0
- .v4_bx         0x08001300        0x0 linker stubs
+.v4_bx          0x08001334        0x0
+ .v4_bx         0x08001334        0x0 linker stubs
 
-.iplt           0x08001300        0x0
- .iplt          0x08001300        0x0 startup_bl.o
+.iplt           0x08001334        0x0
+ .iplt          0x08001334        0x0 startup_bl.o
 
-.rel.dyn        0x08001300        0x0
- .rel.iplt      0x08001300        0x0 startup_bl.o
+.rel.dyn        0x08001334        0x0
+ .rel.iplt      0x08001334        0x0 startup_bl.o
 
-.data           0x20000000        0x8 load address 0x08001300
+.data           0x20000000        0x8 load address 0x08001334
                 0x20000000                        _sdata = .
  *(.data)
  *(.data.*)
@@ -169,12 +169,12 @@ LOAD main_bl.o
                 0x20000004        0x4 main_bl.o
                 0x20000008                        . = ALIGN (0x4)
                 0x20000008                        _edata = .
-                0x08001300                        _ldata = LOADADDR (.data)
+                0x08001334                        _ldata = LOADADDR (.data)
 
-.igot.plt       0x20000008        0x0 load address 0x08001308
+.igot.plt       0x20000008        0x0 load address 0x0800133c
  .igot.plt      0x20000008        0x0 startup_bl.o
 
-.bss            0x20000008      0x424 load address 0x08001308
+.bss            0x20000008      0x424 load address 0x0800133c
                 0x20000008                        _sbss = .
  *(.bss)
  *(.bss.*)

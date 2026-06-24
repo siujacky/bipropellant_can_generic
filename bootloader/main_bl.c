@@ -654,6 +654,34 @@ int main(void)
     NVIC_ICER1 = 0xFFFFFFFFUL;
     NVIC_ICER2 = 0xFFFFFFFFUL;
 
+    /* 1b. Check BKP_DR1 for "reboot-to-bootloader" magic written by the app.
+     *
+     * BKP registers survive NVIC_SystemReset() (they are in the backup power
+     * domain) so the application can signal intent before resetting:
+     *
+     *   // Application side (any HAL or direct register access):
+     *   __HAL_RCC_PWR_CLK_ENABLE();
+     *   __HAL_RCC_BKP_CLK_ENABLE();
+     *   HAL_PWR_EnableBkUpAccess();
+     *   BKP->DR1 = 0xB001U;          // BKP_MAGIC_ENTER_BL
+     *   NVIC_SystemReset();
+     *
+     * Or equivalently via the helper in the app: bootloader_request_reset().
+     *
+     * If the magic is found, the bootloader extends the transport-wait window
+     * from 500 ms to 30 s so the upload tool has a comfortable window to connect
+     * even if it takes a few seconds to start. */
+    uint32_t poll_ms = 500U;          /* normal: 500 ms */
+    {
+        /* Enable PWR + BKP clocks and drop write-protection on backup domain */
+        RCC_APB1ENR |= RCC_APB1ENR_PWREN | RCC_APB1ENR_BKPEN;
+        PWR_CR |= PWR_CR_DBP;
+        if (BKP_DR1 == BKP_MAGIC_ENTER_BL) {
+            BKP_DR1 = 0x0000U;        /* consume the flag immediately */
+            poll_ms = 30000U;         /* extended: 30 s */
+        }
+    }
+
     /* 2. Read BL config; determine boot_slot */
     bl_config_read(&g_config);
 
@@ -677,13 +705,15 @@ int main(void)
      * without needing to send a STATUS query first. */
     bl_broadcast_status();
 
-    /* 5. Poll both transports for 500 ms; first response wins */
+    /* 5. Poll both transports for poll_ms (500 ms normal / 30 s BKP-triggered).
+     * Extended window lets the upload tool start comfortably after the app
+     * calls bootloader_request_reset(). */
     g_transport = TRANSPORT_NONE;
     uint8_t rx_buf[8];
     uint8_t rx_len;
     uint8_t uart_byte = 0;
 
-    for (uint32_t ms = 0; ms < 500 && g_transport == TRANSPORT_NONE; ms++) {
+    for (uint32_t ms = 0; ms < poll_ms && g_transport == TRANSPORT_NONE; ms++) {
         /* Check UART first */
         if (usart_rx_ready()) {
             uart_byte = usart_rx_byte();

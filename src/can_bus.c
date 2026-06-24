@@ -2,6 +2,7 @@
 #include "config.h"
 #include "comms.h"
 #include "phasemap.h"
+#include "bootloader_request.h"
 
 // Force output regardless of debug_out flag (RAW output, no protocol framing)
 void forceLog(char *message) {
@@ -579,16 +580,16 @@ void CAN_ProcessMessages(void) {
              *   data[0] = 0x22  (SDO download, 1 byte)
              *   data[1] = 0x02  (index low byte)
              *   data[2] = 0x50  (index high byte → 0x5002)
-             * The bootloader starts after reset and waits ~500 ms for can-updater.py. */
+             * Calls bootloader_request_reset() which writes BKP_DR1 = 0xB001 so
+             * the bootloader waits 30 s instead of 500 ms — upload tool has time. */
             else if (rx_frame.id == (0x600u + (uint32_t)FlashContent.CAN_BoardID) &&
                      rx_frame.dlc >= 3 &&
                      rx_frame.data[0] == 0x22u &&
                      rx_frame.data[1] == 0x02u &&
                      rx_frame.data[2] == 0x50u) {
                 forceLog(" [REBOOT TO BOOTLOADER]\r\n");
-                /* Small delay so the log message can flush before reset */
                 for (volatile uint32_t _d = 0; _d < 200000u; _d++) {}
-                NVIC_SystemReset();
+                bootloader_request_reset();
             }
             else {
                 can_stats.rx_unknown++;

@@ -22,6 +22,7 @@
 #include "config.h"
 #include "board_active.h"
 #include "phasemap.h"
+#include "bootloader_request.h"
 
 
 #ifdef CONTROL_SENSOR
@@ -607,12 +608,23 @@ int line_test_message(PROTOCOL_STAT *s, char *cmd, char *ascii_out) {
 
 int line_reset_firmware(PROTOCOL_STAT *s, char *cmd, char *ascii_out) {
 //case 'R':
-    if (cmd[1] == '!'){
+    if (cmd[1] == '!') {
+        /* R! — plain reset; stays in application on next boot */
         sprintf(ascii_out, "\r\n!!!!!Resetting!!!!!\r\n");
         s->send_serial_data_wait((unsigned char *)ascii_out, strlen(ascii_out));
         ascii_out[0] = 0;
         HAL_Delay(500);
         HAL_NVIC_SystemReset();
+    } else if (cmd[1] == 'B' || cmd[1] == 'b') {
+        /* RB — reset INTO bootloader; write BKP magic so bootloader waits 30 s
+         * for the upload tool instead of the normal 500 ms.
+         *   Usage: RB
+         *   Then run: python3 tools/can_flash.py -d can0 -f build/hover.bin */
+        sprintf(ascii_out, "\r\nRebooting into bootloader (30s window) ...\r\n");
+        s->send_serial_data_wait((unsigned char *)ascii_out, strlen(ascii_out));
+        ascii_out[0] = 0;
+        HAL_Delay(200);
+        bootloader_request_reset();  /* writes BKP_DR1=0xB001, calls NVIC_SystemReset() */
     }
     return 1;
 }
@@ -754,7 +766,7 @@ int main_ascii_init(PROTOCOL_STAT *s){
     ascii_add_line_fn( 'S', line_main_timing_stats, "show main loop timing stats");
     ascii_add_line_fn( 'E', line_debug_control, "dEbug control, E->off, Ec->console on, Es->console+scope");
 
-    ascii_add_line_fn( 'R', line_reset_firmware, " - R! -> Reset Firmware");
+    ascii_add_line_fn( 'R', line_reset_firmware, " - R! -> Reset Firmware  RB -> Reset to Bootloader (30 s window)");
     ascii_add_line_fn( 'T', line_test_message, "tt - send a test protocol message ");
     ascii_add_line_fn( 'P', line_poweroff_control, " P -power control\r\n"
                 "  P -disablepoweroff\r\n"

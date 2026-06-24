@@ -14,7 +14,8 @@
 
 /* ---- RCC ---- */
 #define RCC_BASE    0x40021000UL
-#define RCC_APB2ENR (*(volatile uint32_t *)(RCC_BASE + 0x18))
+#define RCC_APB1ENR (*(volatile uint32_t *)(RCC_BASE + 0x1C))  /* APB1 clocks */
+#define RCC_APB2ENR (*(volatile uint32_t *)(RCC_BASE + 0x18))  /* APB2 clocks */
 #define RCC_APB2ENR_IOPAEN    (1U << 2)
 #define RCC_APB2ENR_IOPBEN    (1U << 3)
 #define RCC_APB2ENR_USART1EN  (1U << 14)  /* USART1 on APB2 */
@@ -68,5 +69,25 @@ typedef struct {
 #define NVIC_ICER0  (*(volatile uint32_t *)0xE000E180UL)
 #define NVIC_ICER1  (*(volatile uint32_t *)0xE000E184UL)
 #define NVIC_ICER2  (*(volatile uint32_t *)0xE000E188UL)
+
+/* ---- RCC APB1ENR additional bits (for PWR + BKP clock enable) ---- */
+#define RCC_APB1ENR_PWREN  (1UL << 28)   /* Power interface clock */
+#define RCC_APB1ENR_BKPEN  (1UL << 27)   /* Backup interface clock */
+
+/* ---- PWR (Power control) — needed to disable BKP write protection ---- */
+#define PWR_BASE  0x40007000UL
+#define PWR_CR    (*(volatile uint32_t *)(PWR_BASE + 0x00))
+#define PWR_CR_DBP (1UL << 8)            /* Disable Backup domain write Protection */
+
+/* ---- BKP (Backup data registers) — survive NVIC_SystemReset() ----
+ * The application writes BKP_DR1 = BKP_MAGIC_ENTER_BL before calling
+ * NVIC_SystemReset(). The bootloader reads and clears this at startup
+ * to detect "reboot-to-bootloader" and extend the programming window to
+ * 30 s instead of the normal 500 ms.
+ */
+#define BKP_BASE            0x40006C00UL
+#define BKP_DR1             (*(volatile uint16_t *)(BKP_BASE + 0x04))
+#define BKP_MAGIC_ENTER_BL  0xB001U   /* "Boot-One" — arbitrary, unlikely to
+                                        * appear by accident on power-on     */
 
 #endif /* DEVICE_REGS_H */
