@@ -78,7 +78,13 @@ void mcp2515_init(void) {
     mcp_write_reg(MCP_CNF3, 0x03);
     mcp_write_reg(MCP_RXB0CTRL, 0x64);  /* accept all + BUKT */
     mcp_write_reg(MCP_CANINTE,  0x00);
-    mcp_write_reg(MCP_CANCTRL,  MCP_MODE_NORMAL);
+    /* Enter normal mode with OSM (One-Shot Mode, CANCTRL bit 3).
+     * OSM = each TX is attempted ONCE; if no ACK the ABTF flag is set and
+     * TXREQ clears immediately. Without OSM the MCP2515 retries the first
+     * hello indefinitely → floods bus with error frames → Pico 2 gets
+     * RXWARN/RXEP and never receives a valid frame.  With OSM the main loop
+     * can retry at a controlled 50ms interval instead. */
+    mcp_write_reg(MCP_CANCTRL,  MCP_MODE_NORMAL | 0x08U);  /* NORMAL + OSM */
     delay_ms(1);
 }
 

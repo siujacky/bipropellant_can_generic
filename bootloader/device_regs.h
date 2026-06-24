@@ -39,6 +39,7 @@
 /* ---- GPIO ---- */
 #define GPIOA_BASE  0x40010800UL
 #define GPIOB_BASE  0x40010C00UL
+#define GPIOC_BASE  0x40011000UL
 
 typedef struct {
     volatile uint32_t CRL;   /* offset 0x00 — pins 0-7  */
@@ -52,6 +53,7 @@ typedef struct {
 
 #define GPIOA  ((GPIO_TypeDef *)GPIOA_BASE)
 #define GPIOB  ((GPIO_TypeDef *)GPIOB_BASE)
+#define GPIOC  ((GPIO_TypeDef *)GPIOC_BASE)
 
 /* GPIO CRL/CRH mode/config values (2+2 bits per pin) */
 #define GPIO_MODE_OUT_50  0x3U   /* Output, max speed 50MHz */

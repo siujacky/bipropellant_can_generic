@@ -860,31 +860,83 @@ int main(void)
     mcp2515_init();
     usart_init();
 
-    /* 4. Broadcast device identity on CAN (0x7DE) */
-    {
-        uint8_t advert[8];
-        advert[0] = '3'; advert[1] = '1';
-        uint32_t uid0 = DESIG_UNIQUE_ID0;
-        advert[2] = (uint8_t)(uid0);
-        advert[3] = (uint8_t)(uid0 >> 8);
-        advert[4] = (uint8_t)(uid0 >> 16);
-        advert[5] = (uint8_t)(uid0 >> 24);
-        advert[6] = 0x00; advert[7] = 0x00;
-        mcp2515_tx(CAN_TX_ID, advert, 8);
-    }
-    /* Auto-broadcast STATUS frames so any listening host sees the banner
-     * without needing to send a STATUS query first. */
+    /* ----------------------------------------------------------------
+     * LED init: PC13, active-LOW (Blue Pill onboard LED).
+     * Fast-blink during the bootloader window so the user can see the
+     * chip is alive and listening.  The LED GPIO clock (IOPCEN) is on
+     * APB2; we enable it here since mcp2515_init already enabled APB2.
+     * ---------------------------------------------------------------- */
+    RCC_APB2ENR |= (1U << 4);   /* IOPCEN */
+    GPIOC->CRH  = (GPIOC->CRH & ~(0xFU << 20)) | (0x3U << 20); /* PC13 output PP 50MHz */
+    GPIOC->BRR  = (1U << 13);   /* LED ON (active-low) immediately */
+
+    /* ----------------------------------------------------------------
+     * 4. Build the CAN hello frame.
+     * Frame format on 0x7DE (standard, 8 bytes):
+     *   [0] = '3' (0x33)          — stm32-CANBootloader compat marker
+     *   [1] = '1' (0x31)          — protocol version 1
+     *   [2..5] = UID0 (LE)        — unique chip identifier
+     *   [6] = BL_VERSION_MAJOR    — firmware version so network knows which node woke
+     *   [7] = BL_VERSION_MINOR
+     *
+     * With OSM (One-Shot Mode) set in mcp2515_init(), each broadcast
+     * attempt exits immediately if no ACK instead of retrying forever.
+     * We retry manually every HELLO_INTERVAL_MS up to HELLO_MAX_TRIES
+     * times; after that we boot the existing app even without a host.
+     * ---------------------------------------------------------------- */
+#define HELLO_INTERVAL_MS  50U   /* retry interval */
+#define HELLO_MAX_TRIES    10U   /* 10 × 50ms = 500ms normal window */
+
+    uint8_t advert[8];
+    advert[0] = '3'; advert[1] = '1';
+    uint32_t uid0 = DESIG_UNIQUE_ID0;
+    advert[2] = (uint8_t)(uid0);
+    advert[3] = (uint8_t)(uid0 >> 8);
+    advert[4] = (uint8_t)(uid0 >> 16);
+    advert[5] = (uint8_t)(uid0 >> 24);
+    advert[6] = BL_VERSION_MAJOR;
+    advert[7] = BL_VERSION_MINOR;
+
+    /* First broadcast immediately; also send the 3-frame STATUS banner */
+    mcp2515_tx(CAN_TX_ID, advert, 8);
     bl_broadcast_status();
 
     /* 5. Poll both transports for poll_ms (500 ms normal / 30 s BKP-triggered).
-     * Extended window lets the upload tool start comfortably after the app
-     * calls bootloader_request_reset(). */
+     * Re-broadcast hello every HELLO_INTERVAL_MS, stop after HELLO_MAX_TRIES
+     * with no response — then boot normally so a node with no CAN master
+     * doesn't get stuck forever.
+     * LED fast-blinks (toggle each hello) so the user can see the bootloader
+     * is alive.
+     */
     g_transport = TRANSPORT_NONE;
     uint8_t rx_buf[8];
     uint8_t rx_len;
     uint8_t uart_byte = 0;
+    uint32_t last_hello_ms  = 0;
+    uint32_t hello_count    = 0;   /* how many hellos sent so far */
+    uint8_t  led_state      = 0;   /* current LED state (toggle per hello) */
+
+    /* With BKP-extended window (30s): allow up to 600 hellos (30000/50).
+     * Without BKP: cap at HELLO_MAX_TRIES so we don't wait indefinitely. */
+    uint32_t max_hellos = (poll_ms > 500U) ? (poll_ms / HELLO_INTERVAL_MS) : HELLO_MAX_TRIES;
 
     for (uint32_t ms = 0; ms < poll_ms && g_transport == TRANSPORT_NONE; ms++) {
+        /* Re-broadcast hello every HELLO_INTERVAL_MS */
+        if (ms - last_hello_ms >= HELLO_INTERVAL_MS) {
+            mcp2515_tx(CAN_TX_ID, advert, 8);
+            last_hello_ms = ms;
+            hello_count++;
+
+            /* Toggle LED to give visual feedback */
+            led_state ^= 1U;
+            if (led_state) GPIOC->BRR  = (1U << 13);   /* LED on  */
+            else            GPIOC->BSRR = (1U << 13);  /* LED off */
+
+            /* After max_hellos with no connection, give up and boot app */
+            if (hello_count >= max_hellos && poll_ms <= 500U) {
+                break;   /* fall through to jump_to_slot() below */
+            }
+        }
         /* Check UART first */
         if (usart_rx_ready()) {
             uart_byte = usart_rx_byte();
