@@ -233,6 +233,28 @@ static void bl_broadcast_status(void)
     buf[6] = 0xA1U;                    /* Slot A marker (host: 0x08002000) */
     buf[7] = 0xB2U;                    /* Slot B marker (host: 0x08020000) */
     mcp2515_tx(BL_CTRL_TX_ID, buf, 8);
+
+    /* Frame 3: chip self-identification from DBGMCU + FLASHSIZE.
+     * Tag 0x37; both registers are always readable (no debugger required).
+     *   dev_id   = DBGMCU_IDCODE bits [11:0]  (e.g. 0x0414 = F103 high-density)
+     *   rev_id   = DBGMCU_IDCODE bits [31:16]  (silicon revision)
+     *   flash_kb = FLASHSIZE_REG               (e.g. 256 for STM32F103RC)
+     * can_flash.py maps dev_id → part name for the printed banner. */
+    {
+        uint32_t idcode   = DBGMCU_IDCODE;
+        uint16_t dev_id   = (uint16_t)(idcode & 0x0FFFU);
+        uint16_t rev_id   = (uint16_t)(idcode >> 16);
+        uint16_t flash_kb = FLASHSIZE_REG;
+        buf[0] = 0x37U;
+        buf[1] = BL_STATUS_OK;
+        buf[2] = (uint8_t)(dev_id);
+        buf[3] = (uint8_t)(dev_id >> 8);
+        buf[4] = (uint8_t)(rev_id);
+        buf[5] = (uint8_t)(rev_id >> 8);
+        buf[6] = (uint8_t)(flash_kb);
+        buf[7] = (uint8_t)(flash_kb >> 8);
+        mcp2515_tx(BL_CTRL_TX_ID, buf, 8);
+    }
 }
 
 /* Handle an incoming control frame from 0x7DC.
@@ -519,7 +541,26 @@ static void uart_menu(void)
     usart_print("\r\n");
     usart_print("===================================\r\n");
     usart_print("  biPropellant CAN Generic BL v1\r\n");
+    /* Chip self-identification from DBGMCU_IDCODE + FLASHSIZE */
+    {
+        uint32_t idc      = DBGMCU_IDCODE;
+        uint16_t dev_id   = (uint16_t)(idc & 0x0FFFU);
+        uint16_t rev_id   = (uint16_t)(idc >> 16);
+        uint16_t flash_kb = FLASHSIZE_REG;
+        usart_print("  Chip DevID: 0x");
+        usart_print_hex32((uint32_t)dev_id);   /* prints 8 digits; host strips leading zeros */
+        usart_print("  Rev: 0x");
+        usart_print_hex32((uint32_t)rev_id);
+        usart_print("\r\n");
+        usart_print("  Flash: ");
+        usart_print_uint32((uint32_t)flash_kb);
+        usart_print(" KB\r\n");
+    }
     usart_print("  UID: ");
+    usart_print_hex32(DESIG_UNIQUE_ID0);
+    usart_print("-");
+    usart_print_hex32(DESIG_UNIQUE_ID1);
+    usart_print("-");
     usart_print_hex32(DESIG_UNIQUE_ID2);
     usart_print("\r\n");
     if (g_config.boot_slot == 1) {

@@ -65,6 +65,17 @@ typedef struct {
 #define DESIG_UNIQUE_ID1  (*(volatile uint32_t *)(DESIG_UNIQUE_ID_BASE + 0x04))
 #define DESIG_UNIQUE_ID2  (*(volatile uint32_t *)(DESIG_UNIQUE_ID_BASE + 0x08))
 
+/* ---- DBGMCU (ARM CoreSight debug — always readable, no debugger needed) ----
+ * DBGMCU_IDCODE at 0xE0042000:
+ *   bits [11:0]  = Device ID  (e.g. 0x414 = STM32F103xC/D/E high-density)
+ *   bits [15:12] = reserved
+ *   bits [31:16] = Revision ID
+ * FLASHSIZE at 0x1FFFF7E0: 16-bit value = total flash in kilobytes.
+ * Both are valid in production code — no debug connection required.
+ */
+#define DBGMCU_IDCODE      (*(volatile uint32_t *)0xE0042000UL)
+#define FLASHSIZE_REG      (*(volatile uint16_t *)0x1FFFF7E0UL)
+
 /* ---- NVIC disable-all helper ---- */
 #define NVIC_ICER0  (*(volatile uint32_t *)0xE000E180UL)
 #define NVIC_ICER1  (*(volatile uint32_t *)0xE000E184UL)

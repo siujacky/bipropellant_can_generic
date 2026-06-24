@@ -64,7 +64,8 @@ src/board_override.c \
 generated/board_table_stm32f1.c \
 generated/board_af_validity_stm32f1.c \
 src/phasemap.c \
-src/uart_hdsel.c
+src/uart_hdsel.c \
+src/chip_detect.c
 
 
 # ASM sources
