@@ -866,7 +866,7 @@ int main(void)
     bl_config_read(&g_config);
 
     /* 3. Init both transports */
-    bxcan_init();   
+    bxcan_init(1);  /* OSM: no auto-retry in bootloader */   
     usart_init();
 
     /* ----------------------------------------------------------------

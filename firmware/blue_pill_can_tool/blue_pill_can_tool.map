@@ -64,7 +64,7 @@ LOAD usart.o
 LOAD slcan.o
                 0x20002800                        _estack = (ORIGIN (RAM) + LENGTH (RAM))
 
-.text           0x08002000     0x1a5c
+.text           0x08002000     0x1a70
  *(.isr_vector)
  .isr_vector    0x08002000       0x40 startup.o
                 0x08002000                _vectors
@@ -76,126 +76,126 @@ LOAD slcan.o
  .text.print_uint32
                 0x08002090       0x50 main.o
  .text.startup.main
-                0x080020e0      0x57c main.o
+                0x080020e0      0x580 main.o
                 0x080020e0                main
  .text.bxcan_app_init
-                0x0800265c       0xd8 bxcan.o
-                0x0800265c                bxcan_app_init
+                0x08002660       0xe4 bxcan.o
+                0x08002660                bxcan_app_init
  .text.bxcan_app_tx
-                0x08002734       0xc0 bxcan.o
-                0x08002734                bxcan_app_tx
+                0x08002744       0xc0 bxcan.o
+                0x08002744                bxcan_app_tx
  .text.bxcan_app_rx_available
-                0x080027f4       0x14 bxcan.o
-                0x080027f4                bxcan_app_rx_available
+                0x08002804       0x14 bxcan.o
+                0x08002804                bxcan_app_rx_available
  .text.bxcan_app_rx
-                0x08002808       0xa4 bxcan.o
-                0x08002808                bxcan_app_rx
+                0x08002818       0xa4 bxcan.o
+                0x08002818                bxcan_app_rx
  .text.bxcan_app_read_errors
-                0x080028ac       0x10 bxcan.o
-                0x080028ac                bxcan_app_read_errors
+                0x080028bc       0x10 bxcan.o
+                0x080028bc                bxcan_app_read_errors
  .text.gpio_spi_init
-                0x080028bc       0x70 mcp2515.o
+                0x080028cc       0x70 mcp2515.o
  .text.mcp_read_reg
-                0x0800292c       0x74 mcp2515.o
+                0x0800293c       0x74 mcp2515.o
  .text.mcp_write_reg
-                0x080029a0       0x74 mcp2515.o
+                0x080029b0       0x74 mcp2515.o
  .text.mcp2515_release_pins
-                0x08002a14       0x40 mcp2515.o
-                0x08002a14                mcp2515_release_pins
+                0x08002a24       0x40 mcp2515.o
+                0x08002a24                mcp2515_release_pins
  .text.mcp2515_restore_pins
-                0x08002a54        0x4 mcp2515.o
-                0x08002a54                mcp2515_restore_pins
+                0x08002a64        0x4 mcp2515.o
+                0x08002a64                mcp2515_restore_pins
  .text.mcp2515_set_bitrate
-                0x08002a58       0x88 mcp2515.o
-                0x08002a58                mcp2515_set_bitrate
+                0x08002a68       0x84 mcp2515.o
+                0x08002a68                mcp2515_set_bitrate
  .text.mcp2515_init
-                0x08002ae0       0xc8 mcp2515.o
-                0x08002ae0                mcp2515_init
+                0x08002aec       0xc4 mcp2515.o
+                0x08002aec                mcp2515_init
  .text.mcp2515_enter_normal
-                0x08002ba8      0x148 mcp2515.o
-                0x08002ba8                mcp2515_enter_normal
+                0x08002bb0      0x148 mcp2515.o
+                0x08002bb0                mcp2515_enter_normal
  .text.mcp2515_enter_listen_only
-                0x08002cf0      0x110 mcp2515.o
-                0x08002cf0                mcp2515_enter_listen_only
+                0x08002cf8      0x110 mcp2515.o
+                0x08002cf8                mcp2515_enter_listen_only
  .text.mcp2515_tx_rtr
-                0x08002e00      0x190 mcp2515.o
-                0x08002e00                mcp2515_tx_rtr
+                0x08002e08      0x190 mcp2515.o
+                0x08002e08                mcp2515_tx_rtr
  .text.usart1_init
-                0x08002f90       0x88 usart.o
-                0x08002f90                usart1_init
+                0x08002f98       0x88 usart.o
+                0x08002f98                usart1_init
  .text.usart1_tx_byte
-                0x08003018       0x14 usart.o
-                0x08003018                usart1_tx_byte
+                0x08003020       0x14 usart.o
+                0x08003020                usart1_tx_byte
  .text.usart1_print
-                0x0800302c       0x20 usart.o
-                0x0800302c                usart1_print
+                0x08003034       0x20 usart.o
+                0x08003034                usart1_print
  .text.usart1_getchar_nb
-                0x0800304c       0x1c usart.o
-                0x0800304c                usart1_getchar_nb
+                0x08003054       0x1c usart.o
+                0x08003054                usart1_getchar_nb
  .text.usart3_hdsel_init
-                0x08003068       0x90 usart.o
-                0x08003068                usart3_hdsel_init
+                0x08003070       0x90 usart.o
+                0x08003070                usart3_hdsel_init
  .text.usart3_deinit
-                0x080030f8       0x28 usart.o
-                0x080030f8                usart3_deinit
+                0x08003100       0x28 usart.o
+                0x08003100                usart3_deinit
  .text.usart3_tx_byte
-                0x08003120       0x20 usart.o
-                0x08003120                usart3_tx_byte
+                0x08003128       0x20 usart.o
+                0x08003128                usart3_tx_byte
  .text.usart3_getchar_nb
-                0x08003140       0x28 usart.o
-                0x08003140                usart3_getchar_nb
+                0x08003148       0x28 usart.o
+                0x08003148                usart3_getchar_nb
  .text.usart3_rx_byte_timeout
-                0x08003168       0x54 usart.o
-                0x08003168                usart3_rx_byte_timeout
+                0x08003170       0x54 usart.o
+                0x08003170                usart3_rx_byte_timeout
  .text.nibble_to_hex
-                0x080031bc       0x10 slcan.o
-                0x080031bc                nibble_to_hex
+                0x080031c4       0x10 slcan.o
+                0x080031c4                nibble_to_hex
  .text.parse_hex_u32
-                0x080031cc       0x58 slcan.o
-                0x080031cc                parse_hex_u32
+                0x080031d4       0x58 slcan.o
+                0x080031d4                parse_hex_u32
  .text.slcan_format_rx
-                0x08003224      0x134 slcan.o
-                0x08003224                slcan_format_rx
+                0x0800322c      0x134 slcan.o
+                0x0800322c                slcan_format_rx
  .text.slcan_parse_cmd
-                0x08003358      0x268 slcan.o
-                0x08003358                slcan_parse_cmd
+                0x08003360      0x268 slcan.o
+                0x08003360                slcan_parse_cmd
  *(.rodata)
  *(.rodata.*)
  .rodata.main.str1.4
-                0x080035c0      0x475 main.o
+                0x080035c8      0x475 main.o
                                 0x43e (size before relaxing)
  .rodata.str1.4
-                0x08003a35       0x23 main.o
- *fill*         0x08003a35        0x3 
+                0x08003a3d       0x23 main.o
+ *fill*         0x08003a3d        0x3 
  .rodata.CSWTCH.39
-                0x08003a38       0x14 main.o
+                0x08003a40       0x14 main.o
  .rodata.bitrate_table
-                0x08003a4c        0xf mcp2515.o
+                0x08003a54       0x1b mcp2515.o
  .rodata.slcan_parse_cmd.str1.4
-                0x08003a5b       0x11 slcan.o
-                0x08003a6c                        . = ALIGN (0x4)
- *fill*         0x08003a5b        0x1 
-                0x08003a5c                        _etext = .
+                0x08003a6f       0x11 slcan.o
+                0x08003a80                        . = ALIGN (0x4)
+ *fill*         0x08003a6f        0x1 
+                0x08003a70                        _etext = .
 
-.glue_7         0x08003a5c        0x0
- .glue_7        0x08003a5c        0x0 linker stubs
+.glue_7         0x08003a70        0x0
+ .glue_7        0x08003a70        0x0 linker stubs
 
-.glue_7t        0x08003a5c        0x0
- .glue_7t       0x08003a5c        0x0 linker stubs
+.glue_7t        0x08003a70        0x0
+ .glue_7t       0x08003a70        0x0 linker stubs
 
-.vfp11_veneer   0x08003a5c        0x0
- .vfp11_veneer  0x08003a5c        0x0 linker stubs
+.vfp11_veneer   0x08003a70        0x0
+ .vfp11_veneer  0x08003a70        0x0 linker stubs
 
-.v4_bx          0x08003a5c        0x0
- .v4_bx         0x08003a5c        0x0 linker stubs
+.v4_bx          0x08003a70        0x0
+ .v4_bx         0x08003a70        0x0 linker stubs
 
-.iplt           0x08003a5c        0x0
- .iplt          0x08003a5c        0x0 startup.o
+.iplt           0x08003a70        0x0
+ .iplt          0x08003a70        0x0 startup.o
 
-.rel.dyn        0x08003a5c        0x0
- .rel.iplt      0x08003a5c        0x0 startup.o
+.rel.dyn        0x08003a70        0x0
+ .rel.iplt      0x08003a70        0x0 startup.o
 
-.data           0x20000000        0x4 load address 0x08003a5c
+.data           0x20000000        0x4 load address 0x08003a70
                 0x20000000                        _sdata = .
  *(.data)
  *(.data.*)
@@ -203,12 +203,12 @@ LOAD slcan.o
                 0x20000004                        . = ALIGN (0x4)
  *fill*         0x20000001        0x3 
                 0x20000004                        _edata = .
-                0x08003a5c                        _ldata = LOADADDR (.data)
+                0x08003a70                        _ldata = LOADADDR (.data)
 
-.igot.plt       0x20000004        0x0 load address 0x08003a60
+.igot.plt       0x20000004        0x0 load address 0x08003a74
  .igot.plt      0x20000004        0x0 startup.o
 
-.bss            0x20000004       0x44 load address 0x08003a60
+.bss            0x20000004       0x44 load address 0x08003a74
                 0x20000004                        _sbss = .
  *(.bss)
  *(.bss.*)

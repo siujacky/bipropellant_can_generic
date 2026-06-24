@@ -47,7 +47,7 @@ LOAD flash_bl.o
 LOAD main_bl.o
                 0x20001000                        _estack = (ORIGIN (RAM) + LENGTH (RAM))
 
-.text           0x08000000     0x1484
+.text           0x08000000     0x148c
  *(.isr_vector)
  .isr_vector    0x08000000       0x40 startup_bl.o
  *(.text)
@@ -56,119 +56,119 @@ LOAD main_bl.o
                 0x08000040       0x40 startup_bl.o
                 0x08000040                Reset_Handler
  .text.bxcan_init
-                0x08000080       0xd4 bxcan_bl.o
+                0x08000080       0xd8 bxcan_bl.o
                 0x08000080                bxcan_init
  .text.bxcan_tx
-                0x08000154       0x98 bxcan_bl.o
-                0x08000154                bxcan_tx
+                0x08000158       0x98 bxcan_bl.o
+                0x08000158                bxcan_tx
  .text.bxcan_rx
-                0x080001ec       0x84 bxcan_bl.o
-                0x080001ec                bxcan_rx
+                0x080001f0       0x84 bxcan_bl.o
+                0x080001f0                bxcan_rx
  .text.usart_init
-                0x08000270       0x4c usart_bl.o
-                0x08000270                usart_init
+                0x08000274       0x4c usart_bl.o
+                0x08000274                usart_init
  .text.usart_rx_ready
-                0x080002bc       0x10 usart_bl.o
-                0x080002bc                usart_rx_ready
+                0x080002c0       0x10 usart_bl.o
+                0x080002c0                usart_rx_ready
  .text.usart_rx_byte
-                0x080002cc       0x18 usart_bl.o
-                0x080002cc                usart_rx_byte
+                0x080002d0       0x18 usart_bl.o
+                0x080002d0                usart_rx_byte
  .text.usart_tx_byte
-                0x080002e4       0x14 usart_bl.o
-                0x080002e4                usart_tx_byte
+                0x080002e8       0x14 usart_bl.o
+                0x080002e8                usart_tx_byte
  .text.usart_rx_buf
-                0x080002f8       0x40 usart_bl.o
-                0x080002f8                usart_rx_buf
+                0x080002fc       0x40 usart_bl.o
+                0x080002fc                usart_rx_buf
  .text.usart_print
-                0x08000338       0x12 usart_bl.o
-                0x08000338                usart_print
- *fill*         0x0800034a        0x2 
+                0x0800033c       0x12 usart_bl.o
+                0x0800033c                usart_print
+ *fill*         0x0800034e        0x2 
  .text.usart_print_hex32
-                0x0800034c       0x24 usart_bl.o
-                0x0800034c                usart_print_hex32
+                0x08000350       0x24 usart_bl.o
+                0x08000350                usart_print_hex32
  .text.usart_print_uint32
-                0x08000370       0x44 usart_bl.o
-                0x08000370                usart_print_uint32
+                0x08000374       0x44 usart_bl.o
+                0x08000374                usart_print_uint32
  .text.flash_wait
-                0x080003b4       0x10 flash_bl.o
+                0x080003b8       0x10 flash_bl.o
  .text.flash_erase_hw_page
-                0x080003c4       0x38 flash_bl.o
+                0x080003c8       0x38 flash_bl.o
  .text.flash_unlock
-                0x080003fc       0x1c flash_bl.o
-                0x080003fc                flash_unlock
+                0x08000400       0x1c flash_bl.o
+                0x08000400                flash_unlock
  .text.flash_lock
-                0x08000418       0x1c flash_bl.o
-                0x08000418                flash_lock
+                0x0800041c       0x1c flash_bl.o
+                0x0800041c                flash_lock
  .text.flash_erase_page_any
-                0x08000434        0x4 flash_bl.o
-                0x08000434                flash_erase_page_any
+                0x08000438        0x4 flash_bl.o
+                0x08000438                flash_erase_page_any
  .text.flash_erase_region
-                0x08000438       0x1e flash_bl.o
-                0x08000438                flash_erase_region
- *fill*         0x08000456        0x2 
+                0x0800043c       0x1e flash_bl.o
+                0x0800043c                flash_erase_region
+ *fill*         0x0800045a        0x2 
  .text.flash_write_halfword
-                0x08000458       0x24 flash_bl.o
-                0x08000458                flash_write_halfword
+                0x0800045c       0x24 flash_bl.o
+                0x0800045c                flash_write_halfword
  .text.flash_write_page_impl
-                0x0800047c       0x58 flash_bl.o
+                0x08000480       0x58 flash_bl.o
  .text.flash_write_page
-                0x080004d4        0x6 flash_bl.o
-                0x080004d4                flash_write_page
+                0x080004d8        0x6 flash_bl.o
+                0x080004d8                flash_write_page
  .text.flash_write_page_any
-                0x080004da        0x6 flash_bl.o
-                0x080004da                flash_write_page_any
+                0x080004de        0x6 flash_bl.o
+                0x080004de                flash_write_page_any
  .text.delay_ms
-                0x080004e0       0x1c main_bl.o
+                0x080004e4       0x1c main_bl.o
  .text.bl_broadcast_status
-                0x080004fc       0xcc main_bl.o
+                0x08000500       0xcc main_bl.o
  .text.enter_rom_dfu
-                0x080005c8       0xec main_bl.o
+                0x080005cc       0xec main_bl.o
  .text.jump_to_app_at
-                0x080006b4       0x24 main_bl.o
+                0x080006b8       0x24 main_bl.o
  .text.jump_to_slot
-                0x080006d8       0x1c main_bl.o
+                0x080006dc       0x1c main_bl.o
  .text.send_byte
-                0x080006f4       0x2c main_bl.o
+                0x080006f8       0x2c main_bl.o
  .text.ctrl_respond.constprop.0
-                0x08000720       0x38 main_bl.o
+                0x08000724       0x38 main_bl.o
  .text.bl_config_write.constprop.0
-                0x08000758       0x5c main_bl.o
+                0x0800075c       0x5c main_bl.o
  .text.crc32_page.constprop.0
-                0x080007b4       0x4c main_bl.o
+                0x080007b8       0x4c main_bl.o
  .text.uart_do_upload
-                0x08000800       0xb8 main_bl.o
+                0x08000804       0xb8 main_bl.o
  .text.startup.main
-                0x080008b8      0x784 main_bl.o
-                0x080008b8                main
+                0x080008bc      0x788 main_bl.o
+                0x080008bc                main
  *(.rodata)
  *(.rodata.*)
- .rodata.hex.0  0x0800103c       0x11 usart_bl.o
+ .rodata.hex.0  0x08001044       0x11 usart_bl.o
  .rodata.main.str1.1
-                0x0800104d      0x436 main_bl.o
+                0x08001055      0x436 main_bl.o
                                 0x439 (size before relaxing)
-                0x08001484                        . = ALIGN (0x4)
- *fill*         0x08001483        0x1 
-                0x08001484                        _etext = .
+                0x0800148c                        . = ALIGN (0x4)
+ *fill*         0x0800148b        0x1 
+                0x0800148c                        _etext = .
 
-.glue_7         0x08001484        0x0
- .glue_7        0x08001484        0x0 linker stubs
+.glue_7         0x0800148c        0x0
+ .glue_7        0x0800148c        0x0 linker stubs
 
-.glue_7t        0x08001484        0x0
- .glue_7t       0x08001484        0x0 linker stubs
+.glue_7t        0x0800148c        0x0
+ .glue_7t       0x0800148c        0x0 linker stubs
 
-.vfp11_veneer   0x08001484        0x0
- .vfp11_veneer  0x08001484        0x0 linker stubs
+.vfp11_veneer   0x0800148c        0x0
+ .vfp11_veneer  0x0800148c        0x0 linker stubs
 
-.v4_bx          0x08001484        0x0
- .v4_bx         0x08001484        0x0 linker stubs
+.v4_bx          0x0800148c        0x0
+ .v4_bx         0x0800148c        0x0 linker stubs
 
-.iplt           0x08001484        0x0
- .iplt          0x08001484        0x0 startup_bl.o
+.iplt           0x0800148c        0x0
+ .iplt          0x0800148c        0x0 startup_bl.o
 
-.rel.dyn        0x08001484        0x0
- .rel.iplt      0x08001484        0x0 startup_bl.o
+.rel.dyn        0x0800148c        0x0
+ .rel.iplt      0x0800148c        0x0 startup_bl.o
 
-.data           0x20000000        0x8 load address 0x08001484
+.data           0x20000000        0x8 load address 0x0800148c
                 0x20000000                        _sdata = .
  *(.data)
  *(.data.*)
@@ -178,12 +178,12 @@ LOAD main_bl.o
                 0x20000004        0x4 main_bl.o
                 0x20000008                        . = ALIGN (0x4)
                 0x20000008                        _edata = .
-                0x08001484                        _ldata = LOADADDR (.data)
+                0x0800148c                        _ldata = LOADADDR (.data)
 
-.igot.plt       0x20000008        0x0 load address 0x0800148c
+.igot.plt       0x20000008        0x0 load address 0x08001494
  .igot.plt      0x20000008        0x0 startup_bl.o
 
-.bss            0x20000008      0x424 load address 0x0800148c
+.bss            0x20000008      0x424 load address 0x08001494
                 0x20000008                        _sbss = .
  *(.bss)
  *(.bss.*)
