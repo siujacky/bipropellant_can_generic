@@ -206,19 +206,19 @@ def upload_firmware(s: serial.Serial, firmware: bytes, uid0: int) -> bool:
     # Send pages
     for page_idx in range(n_pages):
         page_data  = firmware[page_idx * FLASH_PAGE : (page_idx + 1) * FLASH_PAGE]
-        payload    = page_data[:1020]
-        crc        = _crc32(payload)
+        # Compute CRC over the full 1024 bytes (old protocol only covered 1020,
+        # silently losing the last 4 bytes of every page → corrupted firmware)
+        crc        = _crc32(page_data)
 
         for attempt in range(8):
-            # Send 127 full frames of 8 bytes (= 1016 bytes)
-            for f in range(127):
-                chunk = payload[f*8 : f*8+8]
+            # Send 128 data frames × 8 bytes = 1024 bytes (full page)
+            for f in range(128):
+                chunk = page_data[f*8 : f*8+8]
                 slcan_send(s, BL_DATA_ID, chunk)
                 time.sleep(0.0003)
 
-            # Last frame: bytes 1016-1019 (4 bytes) + CRC32 (4 bytes)
-            last = payload[1016:1020] + struct.pack('<I', crc)
-            slcan_send(s, BL_DATA_ID, last)
+            # Frame 129: CRC32 (4 bytes LE) + 4 padding bytes
+            slcan_send(s, BL_DATA_ID, struct.pack('<I', crc) + b'\x00\x00\x00\x00')
 
             # Wait for 'P' (pass) or 'E' (error)
             deadline = time.monotonic() + 4.0

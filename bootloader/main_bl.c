@@ -576,7 +576,11 @@ can_page_retry:;
         uint32_t byte_idx = 0;
         uint32_t master_crc = 0;
 
-        for (uint32_t f = 0; f < 128; f++) {
+        /* Receive 128 data frames (8 bytes each = 1024 bytes total) followed by
+         * 1 CRC frame (4 bytes CRC + 4 bytes ignored).
+         * Old protocol sent only 1020 bytes and embedded CRC in the last frame,
+         * silently dropping the last 4 bytes of every 1024-byte flash page. */
+        for (uint32_t f = 0; f < 129; f++) {
             uint16_t id;
             uint8_t  tmp[8], rlen;
             uint32_t polls = 2000U * 267U;
@@ -586,21 +590,21 @@ can_page_retry:;
             }
             if (!got) { flash_lock(); jump_to_slot(g_config.boot_slot); }
 
-            if (f == 127) {
-                for (uint8_t b = 0; b < 4 && byte_idx < 1024; b++)
-                    page_buf[byte_idx++] = tmp[b];
-                master_crc = (uint32_t)tmp[4]
-                           | ((uint32_t)tmp[5] << 8)
-                           | ((uint32_t)tmp[6] << 16)
-                           | ((uint32_t)tmp[7] << 24);
+            if (f == 128) {
+                /* Frame 128: CRC only (4 bytes LE) */
+                master_crc = (uint32_t)tmp[0]
+                           | ((uint32_t)tmp[1] << 8)
+                           | ((uint32_t)tmp[2] << 16)
+                           | ((uint32_t)tmp[3] << 24);
             } else {
+                /* Frames 0-127: 8 bytes each = 1024 bytes of page data */
                 uint8_t take = (rlen < (uint8_t)(1024 - byte_idx)) ? rlen : (uint8_t)(1024 - byte_idx);
                 for (uint8_t b = 0; b < take; b++)
                     page_buf[byte_idx++] = tmp[b];
             }
         }
 
-        uint32_t computed_crc = crc32_page(page_buf, 1020);
+        uint32_t computed_crc = crc32_page(page_buf, 1024);
         if (computed_crc != master_crc) {
             send_byte('E');
             if (++retry < 8) goto can_page_retry;
@@ -608,7 +612,7 @@ can_page_retry:;
             jump_to_slot(g_config.boot_slot);
         }
 
-        flash_write_page(flash_addr, page_buf, 1020);
+        flash_write_page(flash_addr, page_buf, 1024);
         flash_addr += FLASH_PAGE_SIZE;
         send_byte('P');
     }
