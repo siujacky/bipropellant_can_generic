@@ -259,12 +259,15 @@ void CAN_ProcessMessages(void) {
 
             can_stats.rx_total++;
 
-            // Decode and log message
-            sprintf(msg, "[CAN RX] ID:0x%03X DLC:%d Data:",
-                    (unsigned int)rx_frame.id, rx_frame.dlc);
-            forceLog(msg);
-            for(uint8_t i = 0; i < rx_frame.dlc && i < 8; i++) {
-                sprintf(msg, " %02X", rx_frame.data[i]);
+            // Log all data in a single call to avoid USART FIFO overflow.
+            // Per-byte forceLog() at 250kbps (frame every ~0.4ms) caused
+            // up to 9 USART transmissions per frame — faster than drain rate.
+            {
+                uint8_t off = (uint8_t)sprintf(msg, "[CAN RX] ID:0x%03X DLC:%d Data:",
+                        (unsigned int)rx_frame.id, rx_frame.dlc);
+                for (uint8_t i = 0; i < rx_frame.dlc && i < 8; i++) {
+                    off += (uint8_t)sprintf(msg + off, " %02X", rx_frame.data[i]);
+                }
                 forceLog(msg);
             }
             
@@ -429,8 +432,18 @@ void CAN_SendStatus(void) {
 
     int32_t speedL = HallData[0].HallSpeed_mm_per_s;
     int32_t speedR = HallData[1].HallSpeed_mm_per_s;
+    // Clamp position before packing into CAN frame.
+    // HallPosn_mm is a running accumulator; on encoder wrap (e.g. >100km
+    // travel) it overflows int32_t and produces a discontinuous jump on
+    // the CAN bus that confuses odometry on the receiver side.
+    // Clamp to ±100,000,000 mm (±100 km) — practical rover range.
+#define POS_CLAMP_MM 100000000L
     int32_t posL = HallData[0].HallPosn_mm;
     int32_t posR = HallData[1].HallPosn_mm;
+    if (posL >  POS_CLAMP_MM) posL =  POS_CLAMP_MM;
+    if (posL < -POS_CLAMP_MM) posL = -POS_CLAMP_MM;
+    if (posR >  POS_CLAMP_MM) posR =  POS_CLAMP_MM;
+    if (posR < -POS_CLAMP_MM) posR = -POS_CLAMP_MM;
     int16_t batVoltage = (int16_t)(electrical_measurements.batteryVoltage * 100.0f);  // Convert V to centivolts
     int16_t boardTemp = (int16_t)electrical_measurements.board_temp_deg_c;
 
@@ -682,9 +695,20 @@ void CAN_PrintStatistics(void) {
     uint8_t cnf1 = MCP2515_ReadRegister(MCP2515_CNF1);
     uint8_t cnf2 = MCP2515_ReadRegister(MCP2515_CNF2);
     uint8_t cnf3 = MCP2515_ReadRegister(MCP2515_CNF3);
+    // Expected CNF values depend on CAN_SPEED (8MHz crystal).
+    // Old check hardcoded 500kbps values (0x00,0x90,0x82) — always
+    // reported MISMATCH when deployed at 250kbps.
+    uint8_t exp1, exp2, exp3;
+    switch (CAN_SPEED) {
+        case MCP2515_SPEED_125KBPS: exp1=0x01; exp2=0x9E; exp3=0x03; break;
+        case MCP2515_SPEED_250KBPS: exp1=0x00; exp2=0x9E; exp3=0x03; break;
+        case MCP2515_SPEED_500KBPS: exp1=0x00; exp2=0x90; exp3=0x02; break;
+        case MCP2515_SPEED_1MBPS:   exp1=0x00; exp2=0x80; exp3=0x00; break;
+        default:                    exp1=0xFF; exp2=0xFF; exp3=0xFF; break;
+    }
+    const char *cnf_ok = (cnf1==exp1 && cnf2==exp2 && cnf3==exp3) ? "OK" : "MISMATCH!";
     sprintf(msg, "SPI Check: CNF1=0x%02X CNF2=0x%02X CNF3=0x%02X %s\r\n",
-            cnf1, cnf2, cnf3,
-            (cnf1 == 0x00 && cnf2 == 0x90 && cnf3 == 0x82) ? "OK" : "MISMATCH!");
+            cnf1, cnf2, cnf3, cnf_ok);
     forceLog(msg);
 
     sprintf(msg, "======================\r\n");

@@ -67,8 +67,11 @@ bool MCP2515_Init(uint8_t speed) {
         return false;
     }
 
-    // Configure RX buffers - receive all messages
-    MCP2515_WriteRegister(MCP2515_RXB0CTRL, 0x60);
+    // Configure RX buffers - receive all messages.
+    // RXB0CTRL: RXM=11 (accept all) | BUKT=1 (roll overflow into RXB1).
+    // Without BUKT=1 a second frame arriving while RXB0 is full is DROPPED
+    // (sets RX0OVR) instead of rolling over — silently loses CAN frames.
+    MCP2515_WriteRegister(MCP2515_RXB0CTRL, 0x64);  // 0x60 | BUKT(bit2)
     MCP2515_WriteRegister(MCP2515_RXB1CTRL, 0x60);
     MCP2515_WriteRegister(MCP2515_CANINTF, 0x00);
     MCP2515_WriteRegister(MCP2515_CANINTE, 0x03);
@@ -149,54 +152,87 @@ bool MCP2515_SetBitrate(uint8_t speed) {
 }
 
 bool MCP2515_SendFrame(CAN_Frame *frame) {
-    // Check if TX buffer 0 is free
-    uint8_t status = MCP2515_ReadRegister(MCP2515_TXB0CTRL);
-    if (status & 0x08) {  // TXREQ bit set - buffer busy
-        return false;
+    // Rotate through TXB0/TXB1/TXB2 so three rapid sends (speed + pos + batt)
+    // never silently drop frames due to a still-pending buffer.
+    // TXBnCTRL register addresses: TXB0=0x30, TXB1=0x40, TXB2=0x50.
+    // TXBnSIDH load addresses:     TXB0=0x31, TXB1=0x41, TXB2=0x51.
+    // RTS bitmask:                 TXB0=0x01, TXB1=0x02, TXB2=0x04.
+    static uint8_t tx_slot = 0;
+    static const uint8_t ctrl_addr[3] = { 0x30, 0x40, 0x50 };
+    static const uint8_t sidh_addr[3] = { 0x31, 0x41, 0x51 };
+    static const uint8_t rts_mask[3]  = { 0x01, 0x02, 0x04 };
+
+    // Find a free TX buffer (TXREQ = bit2 = 0x04 per DS21801J §2.3).
+    // WARNING: bit3 = TXERR (error flag), NOT TXREQ — using 0x08 would
+    // treat error-flagged buffers as busy while missing genuinely busy ones.
+    uint8_t slot = tx_slot;
+    for (uint8_t attempt = 0; attempt < 3; attempt++) {
+        uint8_t ctrl = MCP2515_ReadRegister(ctrl_addr[slot]);
+        if (!(ctrl & 0x04)) {   // TXREQ clear — buffer free
+            // Also clear any previous TXERR/ABTF to allow reuse
+            if (ctrl & 0x18) {
+                MCP2515_ModifyRegister(ctrl_addr[slot], 0x18, 0x00);
+            }
+            break;
+        }
+        slot = (slot + 1) % 3;
+        if (attempt == 2) {
+            return false;   // All three buffers busy
+        }
     }
-    
-    // Load TX buffer 0
+    tx_slot = (slot + 1) % 3;  // Advance for next call
+
+    // Build frame header
     uint8_t txbuf[13];
     uint8_t idx = 0;
-    
+
     if (frame->extended) {
-        // Extended frame (29-bit ID)
-        txbuf[idx++] = (uint8_t)(frame->id >> 21);           // SIDH
-        txbuf[idx++] = (uint8_t)(((frame->id >> 13) & 0xE0) | 
-                                  0x08 |                       // EXIDE bit
-                                  ((frame->id >> 16) & 0x03)); // EID17:16
-        txbuf[idx++] = (uint8_t)(frame->id >> 8);             // EID15:8
-        txbuf[idx++] = (uint8_t)(frame->id);                  // EID7:0
+        txbuf[idx++] = (uint8_t)(frame->id >> 21);
+        txbuf[idx++] = (uint8_t)(((frame->id >> 13) & 0xE0) |
+                                  0x08 |                        // EXIDE bit
+                                  ((frame->id >> 16) & 0x03));
+        txbuf[idx++] = (uint8_t)(frame->id >> 8);
+        txbuf[idx++] = (uint8_t)(frame->id);
     } else {
-        // Standard frame (11-bit ID)
-        txbuf[idx++] = (uint8_t)(frame->id >> 3);             // SIDH
-        txbuf[idx++] = (uint8_t)(frame->id << 5);             // SIDL
-        txbuf[idx++] = 0x00;                                   // EID8
-        txbuf[idx++] = 0x00;                                   // EID0
+        txbuf[idx++] = (uint8_t)(frame->id >> 3);
+        txbuf[idx++] = (uint8_t)(frame->id << 5);
+        txbuf[idx++] = 0x00;
+        txbuf[idx++] = 0x00;
     }
-    
-    // DLC
     txbuf[idx++] = frame->rtr ? (0x40 | frame->dlc) : frame->dlc;
-    
-    // Data bytes
     for (uint8_t i = 0; i < frame->dlc && i < 8; i++) {
         txbuf[idx++] = frame->data[i];
     }
-    
-    // Write to TXB0
+
+    // Load TX buffer
     MCP2515_Select();
     MCP2515_SPITransfer(MCP2515_CMD_WRITE);
-    MCP2515_SPITransfer(0x31);  // TXB0SIDH address
+    MCP2515_SPITransfer(sidh_addr[slot]);
     for (uint8_t i = 0; i < idx; i++) {
         MCP2515_SPITransfer(txbuf[i]);
     }
     MCP2515_Deselect();
-    
+
     // Request to send
     MCP2515_Select();
-    MCP2515_SPITransfer(MCP2515_CMD_RTS | 0x01);  // RTS TXB0
+    MCP2515_SPITransfer(MCP2515_CMD_RTS | rts_mask[slot]);
     MCP2515_Deselect();
-    
+
+    // Post-RTS: check for immediate TXERR (bus-off or arbitration loss).
+    // With OSM not set, MCP2515 auto-retries; poll is just a fast-fail
+    // safety net after ~1ms so callers get an error code, not a silent hang.
+    {
+        volatile uint16_t timeout = 2000;
+        while (timeout--) {
+            uint8_t ctrl = MCP2515_ReadRegister(ctrl_addr[slot]);
+            if (!(ctrl & 0x04)) break;         // TXREQ cleared — sent OK
+            if (ctrl & 0x10) {                 // TXERR set — abort
+                MCP2515_ModifyRegister(ctrl_addr[slot], 0x08, 0x00); // clear TXREQ
+                return false;
+            }
+        }
+    }
+
     return true;
 }
 
@@ -211,8 +247,12 @@ bool MCP2515_ReceiveFrame(CAN_Frame *frame) {
 
     uint8_t rxbuf[13];
 
-    // Use "Read RX Buffer" instruction (0x90/0x94)
-    uint8_t read_cmd = (status & 0x40) ? 0x90 : 0x94;
+    // Use "Read RX Buffer" instruction per DS21801J Table 12-2:
+    //   0x90 = Read RXB0 from SIDH (RXB0 full, bit6 of RX_STATUS set)
+    //   0x96 = Read RXB1 from SIDH (RXB1 full, bit7 set, bit6 clear)
+    // Bug was 0x94 (Read RXB0 from data byte 0 — skips header, returns
+    // garbage for RXB1 and does NOT auto-clear the RXB1 interrupt flag).
+    uint8_t read_cmd = (status & 0x40) ? 0x90 : 0x96;
 
     MCP2515_Select();
     MCP2515_SPITransfer(read_cmd);
