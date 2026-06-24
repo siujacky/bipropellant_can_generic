@@ -4,7 +4,7 @@ can_flash.py — CAN firmware uploader for bipropellant_can_generic bootloader.
 
 Upload channels (unchanged):
     0x7DE   BL -> host  : hello / identity broadcast
-    0x7DD   host -> BL  : firmware data (UID2 match triggers upload)
+    0x7DD   host -> BL  : firmware data (UID0 match triggers upload)
 
 Control channel (new):
     0x7DC   host -> BL  : control commands
@@ -19,13 +19,13 @@ Auth is taken from the hello broadcast (advert[2..4] = uid0 bytes 0-2).
 
 Usage examples:
     # Upload to Slot A (default):
-    python3 can_flash.py -d can0 -f build/app.bin -i <uid2_hex>
+    python3 can_flash.py -d can0 -f build/app.bin -i <uid0_hex>
 
     # Upload to Slot B:
-    python3 can_flash.py -d can0 -f build/app.bin --slot b -i <uid2_hex>
+    python3 can_flash.py -d can0 -f build/app.bin --slot b -i <uid0_hex>
 
     # Upload to custom address:
-    python3 can_flash.py -d can0 -f build/app.bin --addr 0x08020000 -i <uid2_hex>
+    python3 can_flash.py -d can0 -f build/app.bin --addr 0x08020000 -i <uid0_hex>
 
     # Control commands (no firmware needed):
     python3 can_flash.py -d can0 --status
@@ -468,13 +468,13 @@ def main():
         epilog="""
 Examples:
   Upload firmware to Slot A (default):
-    %(prog)s -d can0 -f build/app.bin -i <uid2_hex>
+    %(prog)s -d can0 -f build/app.bin -i <uid0_hex>
 
   Upload firmware to Slot B:
-    %(prog)s -d can0 -f build/app.bin --slot b -i <uid2_hex>
+    %(prog)s -d can0 -f build/app.bin --slot b -i <uid0_hex>
 
   Upload to custom address:
-    %(prog)s -d can0 -f build/app.bin --addr 0x08020000 -i <uid2_hex>
+    %(prog)s -d can0 -f build/app.bin --addr 0x08020000 -i <uid0_hex>
 
   Query bootloader status:
     %(prog)s -d can0 --status
@@ -530,15 +530,15 @@ Examples:
         except ValueError:
             parser.error(f"Invalid --addr value: {args.addr!r} (expected hex, e.g. 0x08020000)")
 
-    uid2_override = int(args.uid, 16) if args.uid else None
+    uid0_override = int(args.uid, 16) if args.uid else None
 
     bus = can.interface.Bus(channel=args.device, bustype="socketcan")
     try:
         # Discover bootloader — prints the banner automatically (startup broadcast)
         uid0_from_bl, uid2_from_bl, uid0_auth = discover_bootloader(bus, timeout=3.0)
 
-        # uid0 for the upload trigger — bootloader matches DESIG_UNIQUE_ID0 (not UID2)
-        uid0_trigger = uid0_from_bl
+        # uid0 for upload trigger — prefer explicit -i override, else use discovered value
+        uid0_trigger = uid0_override if uid0_override is not None else uid0_from_bl
 
         # ---- Control-only commands ----------------------------------------
         if args.status:
