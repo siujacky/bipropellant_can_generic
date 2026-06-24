@@ -1,6 +1,6 @@
 /* mcp2515.h — MCP2515 CAN controller driver header.
- * Software SPI (bit-bang), no HAL.
- * Pins: CS=PB11, SCK=PB10, MOSI=PA2, MISO=PA3, INT=PB12
+ * Hardware SPI1, no HAL.
+ * Pins: PA4=CS  PA5=SCK  PA6=MISO  PA7=MOSI  PB0=INT
  * Crystal: 8 MHz
  */
 

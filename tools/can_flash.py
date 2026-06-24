@@ -439,6 +439,16 @@ def flash_firmware(bus, data: bytes, uid0: int) -> bool:
 
             if ack_byte == ord('P'):
                 break   # page accepted; move to next
+            elif ack_byte == ord('D'):
+                # Bootloader sends 'D' on the last page instead of 'P'.
+                # Guard: only valid on the final page.
+                if page_idx == n_pages - 1:
+                    print()
+                    print("  Bootloader sent 'D' — firmware written, board rebooting.")
+                    return True
+                else:
+                    print(f"\nERROR: got 'D' on non-final page {page_idx} — aborting.")
+                    return False
             elif ack_byte == ord('E'):
                 print(f"  Page {page_idx} CRC error, retry {attempt + 1}/8 ...")
                 continue
@@ -453,7 +463,15 @@ def flash_firmware(bus, data: bytes, uid0: int) -> bool:
         print(f"  Page {page_idx + 1:3d}/{n_pages}  [{pct:3d}%]", end="\r", flush=True)
 
     print()  # newline after progress bar
-    # BL sends 'D' and jumps — upload is complete
+    # All pages sent via 'P' ACKs; wait for final 'D' from bootloader
+    deadline = time.monotonic() + 3.0
+    while time.monotonic() < deadline:
+        resp = bus.recv(timeout=0.1)
+        if resp and resp.arbitration_id == BL_HELLO_ID and len(resp.data) >= 1:
+            if resp.data[0] == ord('D'):
+                print("  Bootloader sent 'D' — firmware written, board rebooting.")
+                return True
+    print("  WARNING: no 'D' received, but all pages completed.")
     return True
 
 
@@ -494,7 +512,7 @@ Examples:
     parser.add_argument("-f", "--firmware",  default=None,
                         help="Firmware .bin file to upload")
     parser.add_argument("-i", "--uid",       default=None,
-                        help="DESIG_UNIQUE_ID2 in hex — required for firmware upload trigger")
+                        help="DESIG_UNIQUE_ID0 in hex — required for firmware upload trigger (printed in bootloader banner)")
 
     # Upload target modifiers
     upload_grp = parser.add_mutually_exclusive_group()
