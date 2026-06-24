@@ -18,7 +18,23 @@
 #define RCC_APB2ENR (*(volatile uint32_t *)(RCC_BASE + 0x18))  /* APB2 clocks */
 #define RCC_APB2ENR_IOPAEN    (1U << 2)
 #define RCC_APB2ENR_IOPBEN    (1U << 3)
+#define RCC_APB2ENR_SPI1EN    (1U << 12)  /* SPI1 on APB2 */
 #define RCC_APB2ENR_USART1EN  (1U << 14)  /* USART1 on APB2 */
+
+/* ---- SPI1 (APB2) — hardware SPI for MCP2515 ----
+ * PA4=CS(GPIO), PA5=SCK(AF_PP), PA6=MISO(float), PA7=MOSI(AF_PP), PB0=INT
+ * At 8MHz APB2 with BR=001 → SPI clock = 8/4 = 2 MHz */
+#define SPI1_BASE     0x40013000UL
+#define SPI1_CR1      (*(volatile uint32_t *)(SPI1_BASE + 0x00))
+#define SPI1_SR       (*(volatile uint32_t *)(SPI1_BASE + 0x08))
+#define SPI1_DR       (*(volatile uint32_t *)(SPI1_BASE + 0x0C))
+#define SPI1_CR1_SSM      (1U << 9)
+#define SPI1_CR1_SSI      (1U << 8)
+#define SPI1_CR1_SPE      (1U << 6)
+#define SPI1_CR1_BR_DIV4  (1U << 3)  /* BR=001 = fPCLK/4 */
+#define SPI1_CR1_MSTR     (1U << 2)
+#define SPI1_SR_RXNE      (1U << 0)
+#define SPI1_SR_TXE       (1U << 1)
 
 /* ---- GPIO ---- */
 #define GPIOA_BASE  0x40010800UL

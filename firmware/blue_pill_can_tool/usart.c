@@ -35,9 +35,12 @@ void usart1_init(uint32_t baud)
     GPIOA->CRH &= ~(0xFU << 4);
     GPIOA->CRH |=  (GPIO_AF_PP_50 << 4);   /* 0xB */
 
-    /* PA10 = RX: floating input — CRH bits[11:8] */
+    /* PA10 = RX: input with pull-UP — CRH bits[11:8] = 0x8, then BSRR.
+     * UART idles HIGH; a floating pin causes noise that can trigger spurious
+     * SLCAN commands (e.g. 'C' close) and reset g_can_open. Pull-up prevents this. */
     GPIOA->CRH &= ~(0xFU << 8);
-    GPIOA->CRH |=  (GPIO_INPUT_FLOAT << 8);  /* 0x4 */
+    GPIOA->CRH |=  (0x8U << 8);              /* 0x8 = input with pull-up/down */
+    GPIOA->BSRR = (1U << 10);               /* drive ODR=1 → enables pull-UP */
 
     /* BRR, then enable USART with TX+RX */
     USART1_BRR = usart_brr(baud);

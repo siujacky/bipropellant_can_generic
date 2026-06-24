@@ -39,6 +39,21 @@
 
 /* CANINTF bits */
 #define MCP_CANINTF_RX0IF   0x01
+#define MCP_CANINTF_RX1IF   0x02
+
+/* TXB0 registers */
+#define MCP_TXB0SIDL    0x32
+#define MCP_TXB0EID8    0x33
+#define MCP_TXB0EID0    0x34
+#define MCP_TXB0DLC     0x35
+#define MCP_TXB0D0      0x36
+#define MCP_TXCTRL_TXREQ 0x08
+
+/* RXB1 registers */
+#define MCP_RXB1SIDH    0x71
+
+/* SPI bit-modify command */
+#define MCP_BIT_MODIFY  0x05
 
 /* Public API */
 void     mcp2515_init(void);

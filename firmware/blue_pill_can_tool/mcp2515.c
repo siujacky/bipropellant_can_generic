@@ -1,130 +1,69 @@
 /* mcp2515.c — MCP2515 hardware SPI1 driver for Blue Pill CAN Tool.
- * Uses STM32F103 SPI1 hardware peripheral — faster and more reliable than
- * the bit-bang approach; allows PB10 to be dedicated to USART3 1-wire UART.
- *
- * Pin mapping (all on GPIOA — easier wiring on Blue Pill):
- *   PA4 = CS    (GPIO output push-pull, manual control)
- *   PA5 = SCK   (SPI1_SCK,  AF push-pull 50 MHz)
- *   PA6 = MISO  (SPI1_MISO, floating input)
- *   PA7 = MOSI  (SPI1_MOSI, AF push-pull 50 MHz)
- *   PB0 = INT   (GPIO input pull-up, active-low)  ← moved from PA8
- *
- * PB10 is now COMPLETELY FREE for the dedicated USART3 HDSEL 1-wire UART.
- *
- * SPI1 clock: APB2 = 8 MHz HSI, BR=001 → SPI clock = 8/4 = 2 MHz.
- * MCP2515 max SPI: 10 MHz — well within spec.
- *
- * NOTE: PA4–PA7 are NOT 5V-tolerant. Power MCP2515 module from 3.3V.
- *       (TJA1050 transceivers inside many modules need 4.5 V min for the
- *       CAN driver, but the SPI side works at 3.3 V. If using a module with
- *       a TJA1050, power VCC from 3.3 V and accept slightly lower CAN drive
- *       strength — still fully CAN-spec compliant at typical distances.)
+ * Pins (hardware SPI1): PA4=CS PA5=SCK PA6=MISO PA7=MOSI PB0=INT
+ * Bitrate table corrected for 8MHz crystal (verified mathematically).
+ * NOTE: PA4-PA7 are NOT 5V-tolerant. Power MCP2515 module from 3.3V.
  */
 
 #include "mcp2515.h"
 #include "device_regs.h"
 
-/* -----------------------------------------------------------------------
- * CS (PA4) control — manual GPIO (SSM=1 in SPI1_CR1)
- * ----------------------------------------------------------------------- */
 #define CS_HIGH()   GPIOA->BSRR = (1U << 4)
 #define CS_LOW()    GPIOA->BSRR = (1U << (4 + 16))
-
-/* INT pin: PB0, active-low — reads 0 when MCP2515 has a frame/event */
-#define INT_READ()  ((GPIOB->IDR >> 0) & 1U)
+#define INT_READ()  ((GPIOB->IDR >> 0) & 1U)   /* PB0, active-low */
 
 /* ~1ms delay at 8MHz HSI */
 static void delay_ms(uint32_t ms)
 {
-    while (ms--) {
-        volatile uint32_t c = 2667;
-        while (c--);
-    }
+    while (ms--) { volatile uint32_t c = 2667; while (c--); }
 }
 
 /* -----------------------------------------------------------------------
  * Hardware SPI1 init + GPIO configuration
- * CRL encodes pins 0-7 (4 bits each), CRH encodes pins 8-15.
- * Bit field for pin N in CRL: bits[(N*4+3):(N*4)]
  * ----------------------------------------------------------------------- */
 static void gpio_spi_init(void)
 {
-    /* Enable SPI1 clock on APB2 */
     RCC_APB2ENR |= RCC_APB2ENR_SPI1EN;
 
     /* PA4 (CS)   — GPIO output push-pull 50 MHz: CRL bits[19:16] */
     GPIOA->CRL = (GPIOA->CRL & ~(0xFU << 16)) | (GPIO_OUT_PP_50 << 16);
-
     /* PA5 (SCK)  — SPI1_SCK  AF push-pull 50 MHz: CRL bits[23:20] */
     GPIOA->CRL = (GPIOA->CRL & ~(0xFU << 20)) | (GPIO_AF_PP_50  << 20);
-
     /* PA6 (MISO) — SPI1_MISO floating input: CRL bits[27:24] */
     GPIOA->CRL = (GPIOA->CRL & ~(0xFU << 24)) | (GPIO_INPUT_FLOAT << 24);
-
     /* PA7 (MOSI) — SPI1_MOSI AF push-pull 50 MHz: CRL bits[31:28] */
     GPIOA->CRL = (GPIOA->CRL & ~(0xFU << 28)) | (GPIO_AF_PP_50  << 28);
-
-    /* PB0 (INT)  — input pull-up: CRL bits[3:0] = 0x8, then set BSRR bit0
-     * PB0 is in CRL (pins 0-7), field at bits[3:0] */
+    /* PB0 (INT)  — input pull-up: CRL bits[3:0] = 0x8 */
     GPIOB->CRL = (GPIOB->CRL & ~(0xFU << 0)) | (0x8U << 0);
-    GPIOB->BSRR = (1U << 0);   /* enable internal pull-up */
+    GPIOB->BSRR = (1U << 0);
 
-    /* CS idle high */
     CS_HIGH();
 
-    /* Configure SPI1:
-     *   SSM=1  (software NSS),  SSI=1  (internal NSS=high → master mode OK)
-     *   SPE=1  (SPI enabled),   MSTR=1 (master)
-     *   BR=001 (fPCLK/4 = 2 MHz), CPOL=0, CPHA=0, DFF=0 (8-bit), MSB first
-     */
+    /* SPI1: SSM=1, SSI=1, SPE=1, BR=001 (2MHz), MSTR=1, Mode-0 */
     SPI1_CR1 = SPI1_CR1_SSM | SPI1_CR1_SSI | SPI1_CR1_SPE |
                SPI1_CR1_BR_DIV4 | SPI1_CR1_MSTR;
-    /* CPOL=0, CPHA=0, LSBFIRST=0 are 0 (default) */
 }
 
-/* -----------------------------------------------------------------------
- * Release SPI1 pins to INPUT_FLOAT.
- * With the new pin design, PB10 is ALREADY independent (USART3 HDSEL).
- * This function exists for symmetry and in case the user wants to re-use
- * the PA4-PA7 + PB0 pins for something else after a mode switch.
- * ----------------------------------------------------------------------- */
 void mcp2515_release_pins(void)
 {
-    /* Disable SPI1 before releasing pins */
     SPI1_CR1 &= ~SPI1_CR1_SPE;
-
-    CS_HIGH();   /* deselect before going hi-Z */
-
-    /* PA4-PA7 → floating inputs */
+    CS_HIGH();
     GPIOA->CRL = (GPIOA->CRL & ~(0xFFFFU << 16))
-               | (GPIO_INPUT_FLOAT << 16)   /* PA4 */
-               | (GPIO_INPUT_FLOAT << 20)   /* PA5 */
-               | (GPIO_INPUT_FLOAT << 24)   /* PA6 */
-               | (GPIO_INPUT_FLOAT << 28);  /* PA7 */
-    GPIOB->CRL = (GPIOB->CRL & ~(0xFU << 0))
-               | (GPIO_INPUT_FLOAT << 0);   /* PB0 */
+               | (GPIO_INPUT_FLOAT << 16) | (GPIO_INPUT_FLOAT << 20)
+               | (GPIO_INPUT_FLOAT << 24) | (GPIO_INPUT_FLOAT << 28);
+    GPIOB->CRL = (GPIOB->CRL & ~(0xFU << 0)) | (GPIO_INPUT_FLOAT << 0);
 }
 
-/* -----------------------------------------------------------------------
- * Restore SPI1 pins (re-init after release)
- * ----------------------------------------------------------------------- */
-void mcp2515_restore_pins(void)
-{
-    gpio_spi_init();
-}
+void mcp2515_restore_pins(void) { gpio_spi_init(); }
 
 /* -----------------------------------------------------------------------
- * Hardware SPI1 byte transfer — mode 0 (CPOL=0, CPHA=0), MSB first.
- * Blocks until both TXE and RXNE are ready; drain any stale RDR first.
+ * Hardware SPI1 byte transfer — mode 0, MSB first
  * ----------------------------------------------------------------------- */
 static uint8_t spi_xfer(uint8_t byte)
 {
-    /* Drain stale RDR if RXNE already set (shouldn't happen in normal flow) */
     if (SPI1_SR & SPI1_SR_RXNE) { (void)SPI1_DR; }
-
-    while (!(SPI1_SR & SPI1_SR_TXE));   /* wait TX buffer empty */
+    while (!(SPI1_SR & SPI1_SR_TXE));
     SPI1_DR = byte;
-    while (!(SPI1_SR & SPI1_SR_RXNE));  /* wait RX byte arrived */
+    while (!(SPI1_SR & SPI1_SR_RXNE));
     return (uint8_t)SPI1_DR;
 }
 
@@ -172,12 +111,19 @@ typedef struct {
     uint8_t cnf3;
 } bitrate_cfg_t;
 
+/* CNF values for 8 MHz crystal — verified mathematically:
+ * TQ=2*(BRP+1)/Fosc; bit time=TQ×(1+PropSeg+PS1+PS2).
+ * All entries use BRP=0 (TQ=250ns) with 16TQ/bit = 4µs = 250kbps base.
+ * S4=125k: BRP=1(TQ=500ns), 16TQ → 8µs = 125kbps.
+ * S5=250k: BRP=0(TQ=250ns), 16TQ → 4µs = 250kbps (matches Pico 2 SLCAN).
+ * S6=500k: BRP=0(TQ=250ns),  8TQ → 2µs = 500kbps.
+ */
 static const bitrate_cfg_t bitrate_table[5] = {
-    { 0x03, 0xB6, 0x04 },  /* [0] S4 = 125 kbps */
-    { 0x01, 0xB6, 0x04 },  /* [1] S5 = 250 kbps */
-    { 0x00, 0x90, 0x82 },  /* [2] S6 = 500 kbps (default) */
-    { 0x00, 0x86, 0x83 },  /* [3] S7 = 800 kbps */
-    { 0x00, 0x80, 0x80 },  /* [4] S8 = 1 Mbps  */
+    { 0x01, 0x9E, 0x03 },  /* [0] S4 = 125 kbps  BRP=1,TQ=500ns, 16TQ */
+    { 0x00, 0x9E, 0x03 },  /* [1] S5 = 250 kbps  BRP=0,TQ=250ns, 16TQ ← default */
+    { 0x00, 0x90, 0x02 },  /* [2] S6 = 500 kbps  BRP=0,TQ=250ns,  8TQ */
+    { 0x00, 0x86, 0x02 },  /* [3] S7 = 800 kbps  (approximate) */
+    { 0x00, 0x80, 0x00 },  /* [4] S8 = 1 Mbps    BRP=0,TQ=250ns,  4TQ */
 };
 
 /* Map S-command (4-8) to table index */

@@ -97,8 +97,21 @@ static uint32_t crc32_page(const uint8_t *data, uint32_t len)
 /* ----------------------------------------------------------------------- */
 /* BL config read/write                                                     */
 /* ----------------------------------------------------------------------- */
+/* Check if BL_CONFIG_ADDR is within this chip's physical flash.
+ * The STM32F103C6T6 (Blue Pill) has only 32KB flash (0x08000000..0x08007FFF).
+ * BL_CONFIG_ADDR = 0x0803E000 is valid on 256KB chips but causes a bus fault
+ * on 32KB chips. We read FLASHSIZE_REG to detect this at runtime.               */
+static int config_addr_valid(void)
+{
+    uint32_t flash_end = 0x08000000UL + ((uint32_t)FLASHSIZE_REG * 1024UL);
+    return (BL_CONFIG_ADDR + sizeof(bl_config_t)) <= flash_end;
+}
+
 static void bl_config_read(bl_config_t *cfg)
 {
+    cfg->magic     = BL_CONFIG_MAGIC;
+    cfg->boot_slot = 0;
+    if (!config_addr_valid()) return;  /* 32KB chip: skip, use defaults */
     *cfg = *(const volatile bl_config_t *)BL_CONFIG_ADDR;
     if (cfg->magic != BL_CONFIG_MAGIC) {
         cfg->magic     = BL_CONFIG_MAGIC;
@@ -108,6 +121,7 @@ static void bl_config_read(bl_config_t *cfg)
 
 static void bl_config_write(const bl_config_t *cfg)
 {
+    if (!config_addr_valid()) return;  /* 32KB chip: can't store config */
     flash_unlock();
     flash_erase_page_any(BL_CONFIG_ADDR);
     const uint8_t *p = (const uint8_t *)cfg;
