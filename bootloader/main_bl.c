@@ -513,7 +513,7 @@ static void uart_do_upload(uint32_t base_addr, int force)
     for (uint32_t p = 0; p < n_pages; p++) {
         uint8_t retry = 0;
 page_retry:;
-        if (!usart_rx_buf(page_buf, 1020, 5000)) {
+        if (!usart_rx_buf(page_buf, 1024, 5000)) {
             flash_lock();
             jump_to_slot(g_config.boot_slot);
         }
@@ -527,7 +527,7 @@ page_retry:;
                             | ((uint32_t)crc_bytes[2] << 16)
                             | ((uint32_t)crc_bytes[3] << 24);
 
-        uint32_t computed_crc = crc32_page(page_buf, 1020);
+        uint32_t computed_crc = crc32_page(page_buf, 1024);
         if (computed_crc != master_crc) {
             usart_tx_byte('E');
             if (++retry < 8) goto page_retry;
@@ -536,9 +536,9 @@ page_retry:;
         }
 
         if (force)
-            flash_write_page_any(flash_addr, page_buf, 1020);
+            flash_write_page_any(flash_addr, page_buf, 1024);
         else
-            flash_write_page(flash_addr, page_buf, 1020);
+            flash_write_page(flash_addr, page_buf, 1024);
 
         flash_addr += FLASH_PAGE_SIZE;
         usart_tx_byte('P');

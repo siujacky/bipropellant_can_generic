@@ -11,6 +11,8 @@
 /* ---- Cortex-M3 SCB ---- */
 #define SCB_BASE    0xE000ED00UL
 #define SCB_VTOR    (*(volatile uint32_t *)(SCB_BASE + 0x08))
+#define SCB_AIRCR   (*(volatile uint32_t *)(SCB_BASE + 0x0C))
+#define NVIC_SystemReset() do { SCB_AIRCR = (0x5FA0000UL|(1UL<<2)); while(1); } while(0)
 
 /* ---- NVIC disable-all helpers ---- */
 #define NVIC_ICER0  (*(volatile uint32_t *)0xE000E180UL)

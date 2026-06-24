@@ -1,10 +1,6 @@
-/* mcp2515_bl.h — Minimal MCP2515 CAN controller driver for STM32F103 bootloader.
- * Software SPI (bit-bang) — no HAL, no peripheral SPI.
- *
- * Hardcoded pins:
- *   CS   = PB11   SCK  = PB10
- *   MOSI = PA2    MISO = PA3
- * Crystal: 8 MHz → 500 kbps (CNF1=0x00, CNF2=0x90, CNF3=0x82)
+/* mcp2515_bl.h — MCP2515 CAN controller driver for STM32F103 bootloader.
+ * Hardware SPI1: PA4=CS  PA5=SCK  PA6=MISO  PA7=MOSI  PB0=INT
+ * Crystal: 8 MHz → 250 kbps (CNF1=0x00, CNF2=0x9E, CNF3=0x03, BRP=0, 16TQ)
  */
 
 #ifndef MCP2515_BL_H

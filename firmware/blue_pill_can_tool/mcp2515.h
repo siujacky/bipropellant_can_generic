@@ -24,7 +24,6 @@
 /* MCP2515 register addresses */
 #define MCP_CANSTAT     0x0E
 #define MCP_CANCTRL     0x0F
-#define MCP_EFLG        0x29   /* Error flag register — wait, actual addr: */
 /* Corrected addresses from MCP2515 datasheet:
  * TEC=0x1C, REC=0x1D, CNF3=0x28, CNF2=0x29, CNF1=0x2A
  * CANINTE=0x2B, CANINTF=0x2C, EFLG=0x2D

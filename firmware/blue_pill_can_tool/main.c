@@ -371,6 +371,15 @@ int main(void)
                 int      ext = 0;
 
                 if (mcp2515_rx(&id, data, &dlc, &ext)) {
+                    /* CAN bootloader trigger: 0x7FF [0xB0,0x01,0xB2] →
+                     * write BKP magic and reset into bootloader (30s window). */
+                    if (id == 0x7FFU && dlc >= 3 &&
+                        data[0] == 0xB0U && data[1] == 0x01U && data[2] == 0xB2U) {
+                        RCC_APB1ENR |= RCC_APB1ENR_PWREN | RCC_APB1ENR_BKPEN;
+                        PWR_CR      |= PWR_CR_DBP;
+                        BKP_DR1      = 0xB001U;
+                        NVIC_SystemReset();
+                    }
                     char line[32];
                     slcan_format_rx(id, ext, dlc, data, line);
                     usart1_print(line);
