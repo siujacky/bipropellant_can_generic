@@ -138,4 +138,8 @@ typedef struct {
 #define BKP_MAGIC_ENTER_BL  0xB001U   /* "Boot-One" — arbitrary, unlikely to
                                         * appear by accident on power-on     */
 
+
+/* ---- bxCAN (needed by bxcan_bl.c) ---- */
+#define RCC_APB1ENR_CANEN   (1UL << 25)   /* CAN clock enable */
+#define RCC_APB2ENR_AFIOEN  (1UL << 0)    /* AFIO clock enable */
 #endif /* DEVICE_REGS_H */

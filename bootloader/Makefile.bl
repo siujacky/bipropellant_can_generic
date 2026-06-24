@@ -29,7 +29,7 @@ LDFLAGS = $(MCU) \
           -Wl,-Map=$(TARGET).map
 
 SRCS    = startup_bl.s \
-          mcp2515_bl.c \
+          bxcan_bl.c \
           usart_bl.c \
           flash_bl.c \
           main_bl.c

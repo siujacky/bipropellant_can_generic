@@ -22,7 +22,7 @@
 
 #include <stdint.h>
 #include "device_regs.h"
-#include "mcp2515_bl.h"
+#include "bxcan_bl.h"
 #include "usart_bl.h"
 #include "flash_bl.h"
 
@@ -268,7 +268,7 @@ static void ctrl_respond(uint8_t cmd, uint8_t status, uint32_t info4)
     buf[5] = (uint8_t)(info4 >> 8);
     buf[6] = (uint8_t)(info4 >> 16);
     buf[7] = (uint8_t)(info4 >> 24);
-    mcp2515_tx(BL_CTRL_TX_ID, buf, 8);
+    bxcan_tx(BL_CTRL_TX_ID, buf, 8);
 }
 
 /* Send 3 STATUS frames on BL_CTRL_TX_ID (0x7DB) carrying the full banner info.
@@ -302,7 +302,7 @@ static void bl_broadcast_status(void)
     buf[5] = (uint8_t)(uid0 >> 8);
     buf[6] = (uint8_t)(uid0 >> 16);
     buf[7] = (uint8_t)(uid0 >> 24);
-    mcp2515_tx(BL_CTRL_TX_ID, buf, 8);
+    bxcan_tx(BL_CTRL_TX_ID, buf, 8);
 
     /* Frame 1: uid1 LE + uid2 low 2 bytes */
     buf[0] = 0x17U;                    /* 0x17 = frame-1 tag */
@@ -313,7 +313,7 @@ static void bl_broadcast_status(void)
     buf[5] = (uint8_t)(uid1 >> 24);
     buf[6] = (uint8_t)(uid2);
     buf[7] = (uint8_t)(uid2 >> 8);
-    mcp2515_tx(BL_CTRL_TX_ID, buf, 8);
+    bxcan_tx(BL_CTRL_TX_ID, buf, 8);
 
     /* Frame 2: uid2 high 2 bytes + version + slot markers */
     buf[0] = 0x27U;                    /* 0x27 = frame-2 tag */
@@ -324,7 +324,7 @@ static void bl_broadcast_status(void)
     buf[5] = BL_VERSION_MINOR;
     buf[6] = 0xA1U;                    /* Slot A marker (host: 0x08002000) */
     buf[7] = 0xB2U;                    /* Slot B marker (host: 0x08020000) */
-    mcp2515_tx(BL_CTRL_TX_ID, buf, 8);
+    bxcan_tx(BL_CTRL_TX_ID, buf, 8);
 
     /* Frame 3: chip self-identification from DBGMCU + FLASHSIZE.
      * Tag 0x37; both registers are always readable (no debugger required).
@@ -345,7 +345,7 @@ static void bl_broadcast_status(void)
         buf[5] = (uint8_t)(rev_id >> 8);
         buf[6] = (uint8_t)(flash_kb);
         buf[7] = (uint8_t)(flash_kb >> 8);
-        mcp2515_tx(BL_CTRL_TX_ID, buf, 8);
+        bxcan_tx(BL_CTRL_TX_ID, buf, 8);
     }
 }
 
@@ -451,7 +451,7 @@ static void send_byte(uint8_t b)
 {
     if (g_transport == TRANSPORT_CAN) {
         uint8_t buf[1] = { b };
-        mcp2515_tx(CAN_TX_ID, buf, 1);
+        bxcan_tx(CAN_TX_ID, buf, 1);
     } else {
         usart_tx_byte(b);
     }
@@ -468,7 +468,7 @@ static int recv_bytes(uint8_t *buf, uint32_t want, uint32_t timeout_ms)
             uint32_t polls = timeout_ms * polls_per_ms;
             int found = 0;
             while (polls--) {
-                if (mcp2515_rx(&id, tmp, &rx_len) && id == CAN_RX_ID) {
+                if (bxcan_rx(&id, tmp, &rx_len) && id == CAN_RX_ID) {
                     found = 1;
                     break;
                 }
@@ -587,7 +587,7 @@ can_page_retry:;
             uint32_t polls = 2000U * 267U;
             int got = 0;
             while (polls--) {
-                if (mcp2515_rx(&id, tmp, &rlen) && id == CAN_RX_ID) { got = 1; break; }
+                if (bxcan_rx(&id, tmp, &rlen) && id == CAN_RX_ID) { got = 1; break; }
             }
             if (!got) { flash_lock(); jump_to_slot(g_config.boot_slot); }
 
@@ -866,7 +866,7 @@ int main(void)
     bl_config_read(&g_config);
 
     /* 3. Init both transports */
-    mcp2515_init();   /* g_bl_canstat / g_bl_canctrl populated for SWD inspection */
+    bxcan_init();   
     usart_init();
 
     /* ----------------------------------------------------------------
@@ -888,7 +888,7 @@ int main(void)
      *   [6] = BL_VERSION_MAJOR    — firmware version so network knows which node woke
      *   [7] = BL_VERSION_MINOR
      *
-     * With OSM (One-Shot Mode) set in mcp2515_init(), each broadcast
+     * With OSM (One-Shot Mode) set in bxcan_init(), each broadcast
      * attempt exits immediately if no ACK instead of retrying forever.
      * We retry manually every HELLO_INTERVAL_MS up to HELLO_MAX_TRIES
      * times; after that we boot the existing app even without a host.
@@ -907,7 +907,7 @@ int main(void)
     advert[7] = BL_VERSION_MINOR;
 
     /* First broadcast immediately; also send the 3-frame STATUS banner */
-    mcp2515_tx(CAN_TX_ID, advert, 8);
+    bxcan_tx(CAN_TX_ID, advert, 8);
     bl_broadcast_status();
 
     /* 5. Poll both transports for poll_ms (500 ms normal / 30 s BKP-triggered).
@@ -932,7 +932,7 @@ int main(void)
     for (uint32_t ms = 0; ms < poll_ms && g_transport == TRANSPORT_NONE; ms++) {
         /* Re-broadcast hello every HELLO_INTERVAL_MS */
         if (ms - last_hello_ms >= HELLO_INTERVAL_MS) {
-            mcp2515_tx(CAN_TX_ID, advert, 8);
+            bxcan_tx(CAN_TX_ID, advert, 8);
             last_hello_ms = ms;
             hello_count++;
 
@@ -961,7 +961,7 @@ int main(void)
 
         /* Check CAN: matching 0x7DD upload trigger or 0x7DC control command */
         uint16_t can_id;
-        if (mcp2515_rx(&can_id, rx_buf, &rx_len)) {
+        if (bxcan_rx(&can_id, rx_buf, &rx_len)) {
             if (can_id == CAN_RX_ID && rx_len >= 4) {
                 /* Compare received 4 bytes against UID0 (not UID2 — UID0 is
                  * the value broadcast in the hello frame and returned by the

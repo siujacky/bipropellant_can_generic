@@ -83,7 +83,7 @@ def slcan_open(port: str, baud: int = 115200) -> serial.Serial:
     # for old firmware. If the new firmware is installed, update this to S5.
     s.write(b'C\r')    # close (forces config mode)
     time.sleep(0.1)
-    s.write(b'S4\r')   # 250 kbps on OLD Pico 2 firmware (bitrates[4]=250000)
+    s.write(b'S5\r')   # 250 kbps (standard SLCAN S5=250k; old firmware: S4=250k)
     time.sleep(0.1)
     s.write(b'O\r')    # open at 250 kbps
     time.sleep(0.3)
@@ -227,10 +227,13 @@ def upload_firmware(s: serial.Serial, firmware: bytes, uid0: int) -> bool:
 
         for attempt in range(8):
             # Send 128 data frames × 8 bytes = 1024 bytes (full page)
+            # bxCAN FIFO depth = 3 frames. At 250kbps one frame ≈ 130µs.
+            # Use 2ms inter-frame gap to ensure bootloader drains FIFO
+            # before overflow drops frames (which would cause CRC mismatch).
             for f in range(128):
                 chunk = page_data[f*8 : f*8+8]
                 slcan_send(s, BL_DATA_ID, chunk)
-                time.sleep(0.0003)
+                time.sleep(0.002)
 
             # Frame 129: CRC32 (4 bytes LE) + 4 padding bytes
             slcan_send(s, BL_DATA_ID, struct.pack('<I', crc) + b'\x00\x00\x00\x00')
