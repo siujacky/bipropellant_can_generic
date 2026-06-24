@@ -4,7 +4,7 @@
  * Features:
  *   - CAN sniffer + injector via SLCAN protocol over USART1 (PA9/PA10, 115200)
  *   - Single-wire UART bridge via USART3 HDSEL (PB10) — DEDICATED pin, no sharing
- *   - MCP2515 on HARDWARE SPI1: CS=PA4 SCK=PA5 MISO=PA6 MOSI=PA7 INT=PA8
+ *   - MCP2515 on HARDWARE SPI1: CS=PA4 SCK=PA5 MISO=PA6 MOSI=PA7 INT=PB0
  *     (all pins on GPIOA — cleaner wiring; PA4-PA7 are 3.3V only, not 5V tolerant)
  *     PB10 is now FULLY INDEPENDENT — used only for the 1-wire UART bridge.
  */
@@ -343,7 +343,7 @@ int main(void)
 
     /* 5. Banner */
     usart1_print("\r\nBlue Pill CAN Tool v1\r\n");
-    usart1_print("Pins: CAN=PA4-PA8(SPI1+INT)  1wire=PB10(USART3)  Serial=PA9/PA10\r\n");
+    usart1_print("Pins: CAN=PA4-PA7(SPI1)+PB0(INT)  1wire=PB10(USART3)  Serial=PA9/PA10\r\n");
     usart1_print("SLCAN: O=open C=close S6=500k t/T=tx r=rtr F=flags s=stat\r\n");
     usart1_print("Bridge: mode uart <baud>  Return: mode can\r\n");
     usart1_print(">");

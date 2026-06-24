@@ -7,7 +7,7 @@
  *   PA5 = SCK   (SPI1_SCK,  AF push-pull 50 MHz)
  *   PA6 = MISO  (SPI1_MISO, floating input)
  *   PA7 = MOSI  (SPI1_MOSI, AF push-pull 50 MHz)
- *   PA8 = INT   (GPIO input pull-up, active-low)
+ *   PB0 = INT   (GPIO input pull-up, active-low)  ← moved from PA8
  *
  * PB10 is now COMPLETELY FREE for the dedicated USART3 HDSEL 1-wire UART.
  *
@@ -30,8 +30,8 @@
 #define CS_HIGH()   GPIOA->BSRR = (1U << 4)
 #define CS_LOW()    GPIOA->BSRR = (1U << (4 + 16))
 
-/* INT pin: PA8, active-low — reads 0 when MCP2515 has a frame/event */
-#define INT_READ()  ((GPIOA->IDR >> 8) & 1U)
+/* INT pin: PB0, active-low — reads 0 when MCP2515 has a frame/event */
+#define INT_READ()  ((GPIOB->IDR >> 0) & 1U)
 
 /* ~1ms delay at 8MHz HSI */
 static void delay_ms(uint32_t ms)
@@ -64,9 +64,10 @@ static void gpio_spi_init(void)
     /* PA7 (MOSI) — SPI1_MOSI AF push-pull 50 MHz: CRL bits[31:28] */
     GPIOA->CRL = (GPIOA->CRL & ~(0xFU << 28)) | (GPIO_AF_PP_50  << 28);
 
-    /* PA8 (INT)  — input pull-up: CRH bits[3:0] = 0x8, then set BSRR bit8 */
-    GPIOA->CRH = (GPIOA->CRH & ~(0xFU << 0)) | (0x8U << 0);
-    GPIOA->BSRR = (1U << 8);   /* enable internal pull-up */
+    /* PB0 (INT)  — input pull-up: CRL bits[3:0] = 0x8, then set BSRR bit0
+     * PB0 is in CRL (pins 0-7), field at bits[3:0] */
+    GPIOB->CRL = (GPIOB->CRL & ~(0xFU << 0)) | (0x8U << 0);
+    GPIOB->BSRR = (1U << 0);   /* enable internal pull-up */
 
     /* CS idle high */
     CS_HIGH();
@@ -85,7 +86,7 @@ static void gpio_spi_init(void)
  * Release SPI1 pins to INPUT_FLOAT.
  * With the new pin design, PB10 is ALREADY independent (USART3 HDSEL).
  * This function exists for symmetry and in case the user wants to re-use
- * the PA4-PA8 pins for something else after a mode switch.
+ * the PA4-PA7 + PB0 pins for something else after a mode switch.
  * ----------------------------------------------------------------------- */
 void mcp2515_release_pins(void)
 {
@@ -94,14 +95,14 @@ void mcp2515_release_pins(void)
 
     CS_HIGH();   /* deselect before going hi-Z */
 
-    /* PA4..PA8 → floating inputs */
+    /* PA4-PA7 → floating inputs */
     GPIOA->CRL = (GPIOA->CRL & ~(0xFFFFU << 16))
                | (GPIO_INPUT_FLOAT << 16)   /* PA4 */
                | (GPIO_INPUT_FLOAT << 20)   /* PA5 */
                | (GPIO_INPUT_FLOAT << 24)   /* PA6 */
                | (GPIO_INPUT_FLOAT << 28);  /* PA7 */
-    GPIOA->CRH = (GPIOA->CRH & ~(0xFU << 0))
-               | (GPIO_INPUT_FLOAT << 0);   /* PA8 */
+    GPIOB->CRL = (GPIOB->CRL & ~(0xFU << 0))
+               | (GPIO_INPUT_FLOAT << 0);   /* PB0 */
 }
 
 /* -----------------------------------------------------------------------
